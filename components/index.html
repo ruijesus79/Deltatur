@@ -1,0 +1,103 @@
+
+<!DOCTYPE html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Deltatur Ops Core</title>
+    <!-- Favicon Data URI: Gold/Green River Delta -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 20C20 20 35 10 55 10C75 10 90 25 90 50C90 75 75 90 55 90C35 90 20 80 20 80' stroke='%232A5A3B' stroke-width='12' stroke-linecap='round' fill='none'/%3E%3Cpath d='M35 35C35 35 45 28 55 28C65 28 72 38 72 50C72 62 65 72 55 72C45 72 35 65 35 65' stroke='%23D4AF37' stroke-width='8' stroke-linecap='round' fill='none'/%3E%3C/svg%3E" />
+    
+    <!-- Scripts & Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Montserrat', 'system-ui', 'sans-serif'],
+              serif: ['Playfair Display', 'Georgia', 'serif'],
+            },
+            colors: {
+              brand: {
+                primary: '#2A5A3B',
+                'primary-dark': '#1e402a', 
+                secondary: '#3D7A4E',
+                light: '#6BA87A',
+                gold: '#D4AF37',
+                'gold-light': '#F4E5BC',
+                dark: '#1a1a1a',
+                text: '#334155',
+                muted: '#64748b',
+                surface: '#ffffff',
+                bg: '#f8fafc',
+                danger: '#ef4444',
+                border: '#e2e8f0'
+              }
+            },
+            boxShadow: {
+              'sm': '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              'card': '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)',
+              'gold': '0 4px 14px 0 rgba(212, 175, 55, 0.25)',
+              'glow': '0 0 15px rgba(42, 90, 59, 0.10)',
+              'float': '0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)'
+            },
+            animation: {
+              'fadeIn': 'fadeIn 0.4s ease-out forwards',
+              'slideUp': 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              'ken-burns': 'kenBurns 25s ease-in-out infinite alternate',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { opacity: '0', transform: 'translateY(10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              kenBurns: {
+                '0%': { transform: 'scale(1.0)' },
+                '100%': { transform: 'scale(1.15) translate(-2%, -2%)' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body { font-family: 'Montserrat', sans-serif; -webkit-font-smoothing: antialiased; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .glass {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+      }
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom": "https://esm.sh/react-dom@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "recharts": "https://esm.sh/recharts@^3.6.0",
+    "react-markdown": "https://esm.sh/react-markdown@^10.1.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-brand-bg text-brand-text h-screen overflow-hidden selection:bg-brand-gold selection:text-white">
+    <div id="root" class="h-full"></div>
+    <!-- Entry Point -->
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "Deltatur Ops Core",
+  "description": "Sistema central de operações turísticas fluviais com inteligência artificial.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera",
+    "geolocation"
+  ]
+}
