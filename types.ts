@@ -6,6 +6,7 @@ export enum AppView {
   ADMIN_DASHBOARD = 'ADMIN_DASHBOARD',
   ADMIN_CONFIG = 'ADMIN_CONFIG',
   SERVICE_DETAIL = 'SERVICE_DETAIL',
+  TUTORIAL = 'TUTORIAL',
   TASKS = 'TASKS',
   FINANCIALS = 'FINANCIALS',
   GUIDE_CONTENT = 'GUIDE_CONTENT',
@@ -137,6 +138,15 @@ export interface ChatMessage {
   sources?: { title: string; uri: string }[];
 }
 
+export interface TeamChatMessage {
+  id: string;
+  senderName: string;
+  senderRole: UserRole;
+  text: string;
+  timestamp: string;
+  imageUrl?: string;
+}
+
 export interface StaffMember {
   id: string;
   name: string;
@@ -144,6 +154,7 @@ export interface StaffMember {
   active: boolean;
   email?: string;
   phone?: string;
+  photoUrl?: string;
 }
 
 export interface EmergencyContact {

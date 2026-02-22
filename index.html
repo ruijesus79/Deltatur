@@ -1,106 +1,137 @@
-
 <!DOCTYPE html>
 <html lang="pt-PT">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Deltatur Ops Core</title>
-    <!-- Favicon Data URI: Gold/Green River Delta -->
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 20C20 20 35 10 55 10C75 10 90 25 90 50C90 75 75 90 55 90C35 90 20 80 20 80' stroke='%230A2F1F' stroke-width='12' stroke-linecap='round' fill='none'/%3E%3Cpath d='M35 35C35 35 45 28 55 28C65 28 72 38 72 50C72 62 65 72 55 72C45 72 35 65 35 65' stroke='%23C5A028' stroke-width='8' stroke-linecap='round' fill='none'/%3E%3C/svg%3E" />
-    
-    <!-- Scripts & Styles -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
-    
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Montserrat', 'system-ui', 'sans-serif'],
-              serif: ['Playfair Display', 'Georgia', 'serif'],
-              roboto: ['Roboto', 'sans-serif'],
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deltatur Ops Core v3 (Stylized)</title>
+  <!-- Favicon Data URI -->
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M20 20C20 20 35 10 55 10C75 10 90 25 90 50C90 75 75 90 55 90C35 90 20 80 20 80' stroke='%23151581' stroke-width='12' stroke-linecap='round' fill='none'/%3E%3Cpath d='M35 35C35 35 45 28 55 28C65 28 72 38 72 50C72 62 65 72 55 72C45 72 35 65 35 65' stroke='%23292824' stroke-width='8' stroke-linecap='round' fill='none'/%3E%3C/svg%3E" />
+
+  <!-- Scripts & Styles -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Afacad', 'system-ui', 'sans-serif'], /* Deltatur Official Font */
+            serif: ['Playfair Display', 'Georgia', 'serif'],
+            roboto: ['Afacad', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              primary: '#55AF69', /* Deltatur Primary Green */
+              'primary-dark': '#0A2F1F', /* Deep luxury green from website */
+              secondary: '#C5A028', /* TRUE GOLD from logo */
+              gold: '#C5A028', /* Official Gold accent */
+              'gold-light': '#D4AF37',
+              dark: '#070b14', /* Deep mysterious navy/black */
+              light: '#FFFFFF',
+              text: '#F8F8F8',
+              muted: '#808080',
+              surface: '#FFFFFF',
+              bg: '#F8F8F8',
+              danger: '#8C1C1C',
+              border: 'rgba(255,255,255,0.1)'
+            }
+          },
+          boxShadow: {
+            'glass': '0 4px 40px rgba(0, 0, 0, 0.05)',
+            'spatial': '0 20px 50px -12px rgba(85, 175, 105, 0.15)', /* Green spatial glow */
+            'bento': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+            'gold-glow': '0 0 25px rgba(230, 245, 235, 0.5)'
+          },
+          animation: {
+            'fadeIn': 'fadeIn 0.6s ease-out forwards',
+            'slideUp': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            'float': 'float 6s ease-in-out infinite',
+            'liquid': 'liquid 10s ease-in-out infinite',
+            'spin-around': 'spin-around calc(var(--speed) * 2) infinite linear',
+            'slide': 'slide var(--speed) ease-in-out infinite alternate',
+            'ripple': 'ripple var(--duration,2s) ease calc(var(--i, 0)*.2s) infinite'
+          },
+          keyframes: {
+            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+            slideUp: {
+              '0%': { opacity: '0', transform: 'translateY(20px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' }
             },
-            colors: {
-              brand: {
-                primary: '#0A2F1F', // Deep River Green
-                'primary-dark': '#051810', 
-                secondary: '#163D29', // Forest Green
-                light: '#E2E8F0',
-                gold: '#C5A028', // Antique Gold
-                'gold-light': '#F4E5BC',
-                dark: '#020617',
-                text: '#1E293B',
-                muted: '#64748B',
-                surface: '#FFFFFF',
-                bg: '#F8FAFC',
-                danger: '#E11D48',
-                border: '#E2E8F0'
-              }
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-10px)' }
             },
-            boxShadow: {
-              'glass': '0 12px 40px 0 rgba(10, 47, 31, 0.12)',
-              'spatial': '0 20px 50px -12px rgba(0, 0, 0, 0.25)',
-              'bento': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-              'gold-glow': '0 0 25px rgba(197, 160, 40, 0.25)'
+            liquid: {
+              '0%, 100%': { borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%' },
+              '50%': { borderRadius: '30% 60% 70% 30% / 50% 60% 30% 60%' }
             },
-            animation: {
-              'fadeIn': 'fadeIn 0.6s ease-out forwards',
-              'slideUp': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
-              'float': 'float 6s ease-in-out infinite',
-              'liquid': 'liquid 10s ease-in-out infinite',
+            'spin-around': {
+              '0%': { transform: 'translateZ(0) rotate(0)' },
+              '15%, 35%': { transform: 'translateZ(0) rotate(90deg)' },
+              '65%, 85%': { transform: 'translateZ(0) rotate(270deg)' },
+              '100%': { transform: 'translateZ(0) rotate(360deg)' }
             },
-            keyframes: {
-              fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-              slideUp: {
-                '0%': { opacity: '0', transform: 'translateY(20px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' }
-              },
-              float: {
-                '0%, 100%': { transform: 'translateY(0)' },
-                '50%': { transform: 'translateY(-10px)' }
-              },
-              liquid: {
-                '0%, 100%': { borderRadius: '60% 40% 30% 70% / 60% 30% 70% 40%' },
-                '50%': { borderRadius: '30% 60% 70% 30% / 50% 60% 30% 60%' }
-              }
+            slide: {
+              to: { transform: 'translate(calc(100cqw - 100%), 0)' }
+            },
+            ripple: {
+              '0%, 100%': { transform: 'translate(-50%, -50%) scale(1)' },
+              '50%': { transform: 'translate(-50%, -50%) scale(0.9)' }
             }
           }
         }
       }
-    </script>
-    <style>
-      body { 
-        background-color: #F8FAFC; 
-        color: #1E293B; 
-        -webkit-font-smoothing: antialiased;
-      }
-      .glass-card {
-        background: rgba(255, 255, 255, 0.85);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-        box-shadow: 0 10px 30px -5px rgba(0,0,0,0.05);
-      }
-      .spatial-layer {
-        transform-style: preserve-3d;
-        transition: transform 0.3s ease;
-      }
-      .spatial-layer:hover {
-        transform: translateZ(10px) translateY(-5px);
-      }
-      .liquid-bg {
-        background: linear-gradient(135deg, #0A2F1F 0%, #163D29 100%);
-      }
-      .no-scrollbar::-webkit-scrollbar { display: none; }
-      
-      /* Sunset Glow Mode */
-      .sunset-glow {
-        background-color: #FFF9E6 !important;
-        background-image: radial-gradient(circle at top right, rgba(197, 160, 40, 0.05), transparent) !important;
-      }
-    </style>
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@400;700;900&family=Outfit:wght@300;400;600;700;900&family=Roboto:wght@400;700;900&display=swap"
+    rel="stylesheet">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Afacad:wght@400;500;600;700&display=swap');
+
+    body {
+      background-color: #F8F8F8;
+      /* Deltatur Canvas base */
+      color: #333333;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05);
+    }
+
+    .spatial-layer {
+      transform-style: preserve-3d;
+      transition: transform 0.3s ease;
+    }
+
+    .spatial-layer:hover {
+      transform: translateZ(10px) translateY(-5px);
+    }
+
+    .liquid-bg {
+      background: linear-gradient(135deg, #0A2F1F 0%, #163D29 100%);
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Sunset Glow Mode */
+    .sunset-glow {
+      background-color: #FFF9E6 !important;
+      background-image: radial-gradient(circle at top right, rgba(197, 160, 40, 0.05), transparent) !important;
+    }
+  </style>
   <script type="importmap">
 {
   "imports": {
@@ -111,13 +142,19 @@
     "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
     "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
     "recharts": "https://esm.sh/recharts@^3.6.0",
-    "react-markdown": "https://esm.sh/react-markdown@^10.1.0"
+    "react-markdown": "https://esm.sh/react-markdown@^10.1.0",
+    "framer-motion": "https://esm.sh/framer-motion@^11.0.0",
+    "react-countup": "https://esm.sh/react-countup@^6.5.0",
+    "clsx": "https://esm.sh/clsx@^2.1.1",
+    "tailwind-merge": "https://esm.sh/tailwind-merge@^2.2.1"
   }
 }
 </script>
 </head>
-  <body class="selection:bg-brand-gold selection:text-white overflow-hidden">
-    <div id="root" class="h-full"></div>
-    <script type="module" src="./index.tsx"></script>
-  </body>
+
+<body class="selection:bg-brand-gold selection:text-white overflow-hidden">
+  <div id="root" class="h-full"></div>
+  <script type="module" src="./index.tsx"></script>
+</body>
+
 </html>
