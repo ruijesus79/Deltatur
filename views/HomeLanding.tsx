@@ -52,13 +52,13 @@ const HomeLanding: React.FC<HomeLandingProps> = ({ onSelectRole }) => {
     };
 
     return (
-        <div className="relative min-h-screen bg-[#070b14] overflow-hidden font-sans selection:bg-brand-gold/30 selection:text-white">
+        <div className="relative min-h-screen bg-[#070b14] overflow-x-hidden font-sans selection:bg-brand-gold/30 selection:text-white">
 
             {/* 0. GRAIN TEXTURE OVERLAY */}
             <div className="absolute inset-0 z-[5] opacity-[0.06] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
 
             {/* 1. Background com Parallax Suave */}
-            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
                 <div
                     className="absolute inset-[-5%] w-[110%] h-[110%] transition-transform duration-1000 ease-out"
                     style={{
@@ -82,13 +82,13 @@ const HomeLanding: React.FC<HomeLandingProps> = ({ onSelectRole }) => {
             </div>
 
             {/* 2. Main Content Container */}
-            <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6 py-12">
+            <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-6 py-12 md:py-20">
 
                 <motion.div
                     variants={containerVariants}
                     initial="hidden"
                     animate="show"
-                    className="w-full max-w-[480px] flex flex-col items-center"
+                    className="w-full max-w-[480px] md:max-w-4xl flex flex-col items-center"
                 >
 
                     {/* Header / Logo */}
@@ -107,7 +107,7 @@ const HomeLanding: React.FC<HomeLandingProps> = ({ onSelectRole }) => {
                     </motion.div>
 
                     {/* Role Selection Grid - ADMIN REPLACED TO TOP FOR BETTER ACCESS */}
-                    <div className="grid grid-cols-1 gap-3 md:gap-5 w-full relative z-20">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 w-full relative z-20">
 
                         {/* THE ADMIN PORTAL - NOW HIGHER UP */}
                         <motion.button
