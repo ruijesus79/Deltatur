@@ -423,7 +423,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="p-6 md:p-12 md:max-w-7xl mx-auto space-y-8 animate-fadeIn">
 
                         {/* 1. TOP ACTION CENTER & TELEMETRY */}
-                        <div className="flex flex-col xl:flex-row gap-8 items-stretch animate-fadeIn">
+                        <div className="flex flex-col lg:flex-row gap-8 items-stretch animate-fadeIn">
 
                             {/* HEADER LEFT: ACTION CENTER */}
                             <div className="flex-1 min-w-[340px] bg-[#0A101C]/40 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 md:p-12 relative overflow-hidden group shadow-spatial">
@@ -471,8 +471,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             </div>
 
                             {/* TELEMETRY GRID: DECOUPLED & SPACIOUS */}
-                            <div className="flex-[1.5] bg-[#0A101C]/40 backdrop-blur-xl rounded-[40px] px-8 py-10 border border-white/10 relative z-10 shadow-spatial group">
-                                <div className="flex justify-between items-center mb-10 px-2">
+                            <div className="flex-[1.5] w-full bg-[#0A101C]/40 backdrop-blur-xl rounded-[40px] px-8 py-10 border border-white/10 relative z-10 shadow-spatial group flex flex-col justify-between">
+                                <div className="flex justify-between items-center mb-8 px-2">
                                     <div className="flex flex-col">
                                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 flex items-center gap-2">
                                             <Zap className="w-3 h-3 text-brand-gold fill-brand-gold" /> Telemetria River-Core
@@ -490,7 +490,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     </button>
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-6 h-full">
                                     <div className="bg-gradient-to-br from-white/[0.03] to-transparent p-6 rounded-[32px] border border-white/5 hover:border-white/20 transition-all duration-500 relative overflow-hidden">
                                         <div className="flex justify-center mb-4 opacity-40"><Thermometer className="w-6 h-6 text-brand-gold" /></div>
                                         <p className="text-3xl font-black text-white tracking-tighter text-center">{weather?.temp ?? '--'}<span className="text-brand-gold text-sm ml-0.5">º</span></p>
