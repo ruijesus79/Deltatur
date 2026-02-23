@@ -444,7 +444,7 @@ export const INITIAL_KNOWLEDGE_BASE: KnowledgeArticle[] = [
 
 export const INITIAL_GUIDES = ['Caria', 'Manuel', 'António', 'Catarina', 'Ricardo Freitas'];
 export const PARTNERS = ['Manuel Porto', 'Lamego Hotel', 'Douro Azul', 'Viking River', 'GetYourGuide', 'Viator'];
-export const SERVICE_TYPES = ['Passeio de Barco Privado', 'Passeio de Barco Partilhado', 'Sunset Privado', 'Transfer'];
+export const SERVICE_TYPES = ['Passeio de Barco Privado', 'Passeio de Barco Partilhado', 'Sunset Privado', 'Passeio com Almoço', 'Passeio no Tua', 'Transfer'];
 export const INITIAL_GALLERY: GalleryImage[] = [
   { id: 'g1', url: 'https://deltatur.pt/wp-content/uploads/2025/09/DIA-1-FOTOGRAFIAS-27-1024x682.webp', title: 'Douro Lifestyle', category: 'DELTATUR', uploadedBy: 'Admin', date: '2025-05-20' }
 ];

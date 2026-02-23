@@ -48,7 +48,7 @@ export interface WeatherConditions {
 }
 
 // --- NOVO SISTEMA LOGÍSTICO GRANULAR ---
-export type LogisticsTaskType = 'PREP_BARCO' | 'DEGUSTACAO' | 'ABASTECER_COMB' | 'ABASTECER_AGUA' | 'FECHO_COMPLETO';
+export type LogisticsTaskType = 'PREP_BARCO' | 'DEGUSTACAO' | 'ABASTECER_COMB' | 'ABASTECER_AGUA' | 'LIMPEZA_PRIME' | 'RESTOCK_MINIBAR' | 'FECHO_COMPLETO';
 
 export interface LogisticsTaskEntry {
   id: string;

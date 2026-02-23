@@ -5,7 +5,7 @@ import {
     Ship, ChevronRight, Waves, Zap, AlertTriangle, ShieldCheck,
     Thermometer, Wind, RefreshCw, Loader2, Info, Navigation2,
     Map as MapIcon, Calendar, Clock, Users, MapPin, Phone,
-    FileText, ExternalLink, Siren, CloudSun, Radar, Wine, User, Anchor, FileWarning, CheckSquare, Camera, CheckCircle, X, Droplets, MessageCircle, Radio
+    FileText, ExternalLink, Siren, CloudSun, Radar, Wine, User, Anchor, FileWarning, CheckSquare, Camera, CheckCircle, X, Droplets, MessageCircle, Radio, DollarSign
 } from 'lucide-react';
 import { getLiveWeatherAndRiverConditions, getPredictiveRiverSafety } from '../services/geminiService';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -189,6 +189,8 @@ const HomeGuide: React.FC<HomeGuideProps> = ({
             case 'DEGUSTACAO': return 'Setup de Vinhos & Tapas';
             case 'ABASTECER_COMB': return 'Nível de Combustível';
             case 'ABASTECER_AGUA': return 'Nível de Água Potável';
+            case 'LIMPEZA_PRIME': return 'Limpeza Profunda (WC/Vidros)';
+            case 'RESTOCK_MINIBAR': return 'Abastecimento de Mini-Arcas';
             case 'FECHO_COMPLETO': return 'Checklist de Fim de Dia';
             default: return type;
         }
@@ -470,58 +472,109 @@ const HomeGuide: React.FC<HomeGuideProps> = ({
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5">
-                    {tasks.length > 0 ? tasks.map(task => (
-                        <SwipeAction
-                            key={task.id}
-                            rightActions={
-                                <button
-                                    onClick={() => onNavigate(AppView.SERVICE_DETAIL, task)}
-                                    className="w-full h-full bg-[#0A2F1F] text-brand-gold flex flex-col items-center justify-center font-black text-[10px] uppercase tracking-[0.3em] rounded-r-[40px] active:scale-95 transition-transform border-l border-brand-gold/20"
-                                >
-                                    Logbook
-                                </button>
-                            }
-                        >
-                            <button
-                                onClick={() => onNavigate(AppView.SERVICE_DETAIL, task)}
-                                className={`w-full bg-white p-0 rounded-[40px] border border-brand-border/60 hover:border-brand-gold/40 transition-all text-left flex flex-col shadow-glass group relative overflow-hidden ${task.status === 'IN_PROGRESS' ? 'ring-2 ring-brand-gold' : ''}`}
-                            >
-                                <div className="p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center gap-8">
-                                    <div className="flex items-center gap-6 shrink-0">
-                                        <div className={`w-20 h-20 rounded-[28px] flex flex-col items-center justify-center shadow-inner border transition-colors ${task.status === 'IN_PROGRESS' ? 'bg-[#0A2F1F] border-brand-gold text-brand-gold' : 'bg-brand-bg border-brand-border/40 text-brand-dark/40'}`}>
-                                            <span className="text-lg font-black tracking-tighter">{task.time}</span>
-                                            <div className="w-6 h-[2px] bg-brand-gold/30 my-1"></div>
-                                            <Clock className="w-3.5 h-3.5 opacity-50" />
-                                        </div>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-3 mb-3">
-                                            <Ship className="w-4 h-4 text-brand-gold" />
-                                            <p className="text-[10px] font-black text-brand-muted uppercase tracking-[0.3em]">{task.boat}</p>
-                                            {task.isPrivate && <span className="px-3 py-0.5 rounded-full bg-brand-primary text-white text-[9px] font-black uppercase tracking-widest">Privado</span>}
-                                        </div>
-                                        <h4 className="text-3xl font-['Cormorant_Garamond'] font-bold text-brand-dark tracking-tight truncate leading-tight">{task.clientName}</h4>
-                                        <div className="flex items-center gap-6 mt-5 pt-5 border-t border-brand-border/40 w-full">
-                                            <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest text-brand-muted/70">
-                                                <Users className="w-4 h-4 text-brand-gold" /> {task.pax} Passageiros
-                                            </div>
-                                            {task.crew?.condutor && (
-                                                <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest text-brand-muted/70">
-                                                    <Anchor className="w-4 h-4 text-brand-gold" /> Mestre: {task.crew.condutor.split(' ')[0]}
+                <div className="grid grid-cols-1 gap-12">
+                    {/* HOJE */}
+                    {tasks.filter(t => t.date === todayDate || !t.date).length > 0 && (
+                        <div className="space-y-5">
+                            <h4 className="text-[9px] font-black text-brand-gold uppercase tracking-[0.3em] px-2">Missões de Hoje</h4>
+                            <div className="grid grid-cols-1 gap-5">
+                                {tasks.filter(t => t.date === todayDate || !t.date).map(task => (
+                                    <SwipeAction
+                                        key={task.id}
+                                        rightActions={
+                                            <button
+                                                onClick={() => onNavigate(AppView.SERVICE_DETAIL, task)}
+                                                className="w-full h-full bg-[#0A2F1F] text-brand-gold flex flex-col items-center justify-center font-black text-[10px] uppercase tracking-[0.3em] rounded-r-[40px] border-l border-brand-gold/20"
+                                            >
+                                                Logbook
+                                            </button>
+                                        }
+                                    >
+                                        <button
+                                            onClick={() => onNavigate(AppView.SERVICE_DETAIL, task)}
+                                            className={`w-full bg-white p-0 rounded-[40px] border border-brand-border/60 hover:border-brand-gold/40 transition-all text-left flex flex-col shadow-glass group relative overflow-hidden ${task.status === 'IN_PROGRESS' ? 'ring-2 ring-brand-gold' : ''}`}
+                                        >
+                                            <div className="p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center gap-8">
+                                                <div className="flex items-center gap-6 shrink-0">
+                                                    <div className={`w-20 h-20 rounded-[28px] flex flex-col items-center justify-center shadow-inner border transition-colors ${task.status === 'IN_PROGRESS' ? 'bg-[#0A2F1F] border-brand-gold text-brand-gold' : 'bg-brand-bg border-brand-border/40 text-brand-dark/40'}`}>
+                                                        <span className="text-lg font-black tracking-tighter">{task.time}</span>
+                                                        <div className="w-6 h-[2px] bg-brand-gold/30 my-1"></div>
+                                                        <Clock className="w-3.5 h-3.5 opacity-50" />
+                                                    </div>
                                                 </div>
-                                            )}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3 mb-3">
+                                                        <Ship className="w-4 h-4 text-brand-gold" />
+                                                        <p className="text-[10px] font-black text-brand-muted uppercase tracking-[0.3em]">{task.boat}</p>
+                                                        {task.isPrivate && <span className="px-3 py-0.5 rounded-full bg-brand-primary text-white text-[9px] font-black uppercase tracking-widest">Privado</span>}
+                                                    </div>
+                                                    <h4 className="text-3xl font-['Cormorant_Garamond'] font-bold text-brand-dark tracking-tight truncate leading-tight">{task.clientName}</h4>
+                                                    <div className="flex flex-wrap items-center gap-4 mt-4">
+                                                        {task.hasTasting && <span className="px-3 py-1 bg-brand-gold/10 text-brand-gold text-[9px] font-black uppercase tracking-widest border border-brand-gold/20 flex items-center gap-1.5"><Wine className="w-3 h-3" /> Degustação</span>}
+                                                        {task.hasLunch && <span className="px-3 py-1 bg-brand-primary/10 text-brand-primary text-[9px] font-black uppercase tracking-widest border border-brand-primary/20 flex items-center gap-1.5"><Ship className="w-3 h-3" /> Almoço ({task.lunchLocation})</span>}
+                                                        {task.requiresCollection && <span className="px-3 py-1 bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-widest border border-red-100 flex items-center gap-1.5"><DollarSign className="w-3 h-3" /> €{task.collectionAmount}</span>}
+                                                    </div>
+                                                    <div className="flex flex-wrap items-center gap-6 mt-5 pt-5 border-t border-brand-border/40 w-full">
+                                                        <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest text-brand-muted/70">
+                                                            <Users className="w-4 h-4 text-brand-gold" /> {task.pax} PAX
+                                                        </div>
+                                                        {task.crew?.condutor && (
+                                                            <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest text-brand-dark">
+                                                                <Anchor className="w-4 h-4 text-brand-gold" /> Mestre: {task.crew.condutor}
+                                                            </div>
+                                                        )}
+                                                        {task.crew?.assistente && (
+                                                            <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest text-brand-muted/70">
+                                                                <User className="w-4 h-4 text-brand-gold" /> Apoio: {task.crew.assistente}
+                                                            </div>
+                                                        )}
+                                                        {task.crew?.guia && (
+                                                            <div className="flex items-center gap-2.5 text-[10px] font-black uppercase tracking-widest text-brand-muted/70">
+                                                                <FileText className="w-4 h-4 text-brand-gold" /> Guia: {task.crew.guia}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0 self-end md:self-center">
+                                                    <div className="w-14 h-14 rounded-full border border-brand-border flex items-center justify-center group-hover:bg-[#0A2F1F] group-hover:text-brand-gold group-hover:border-[#0A2F1F] transition-all shadow-sm">
+                                                        <ChevronRight className="w-6 h-6" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </SwipeAction>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* FUTURO / AMANHÃ */}
+                    {tasks.filter(t => t.date && t.date > todayDate).length > 0 && (
+                        <div className="space-y-5">
+                            <h4 className="text-[9px] font-black text-brand-muted uppercase tracking-[0.3em] px-2 opacity-50">Próximos Dias</h4>
+                            <div className="grid grid-cols-1 gap-5">
+                                {tasks.filter(t => t.date && t.date > todayDate).map(task => (
+                                    <button
+                                        key={task.id}
+                                        onClick={() => onNavigate(AppView.SERVICE_DETAIL, task)}
+                                        className="w-full bg-white/40 p-8 rounded-[40px] border border-brand-border/40 hover:bg-white transition-all text-left flex items-center gap-8 shadow-sm group"
+                                    >
+                                        <div className="w-16 h-16 rounded-2xl bg-brand-bg flex flex-col items-center justify-center border border-brand-border/40 shrink-0">
+                                            <span className="text-sm font-black text-brand-dark">{task.time}</span>
+                                            <span className="text-[8px] font-black text-brand-muted uppercase tracking-widest">{task.date?.split('-').reverse().slice(0, 2).join('/')}</span>
                                         </div>
-                                    </div>
-                                    <div className="shrink-0 self-end md:self-center">
-                                        <div className="w-14 h-14 rounded-full border border-brand-border flex items-center justify-center group-hover:bg-[#0A2F1F] group-hover:text-brand-gold group-hover:border-[#0A2F1F] transition-all shadow-sm">
-                                            <ChevronRight className="w-6 h-6" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[9px] font-black text-brand-gold uppercase tracking-[0.2em] mb-1">{task.boat}</p>
+                                            <h4 className="text-xl font-['Cormorant_Garamond'] font-bold text-brand-dark truncate">{task.clientName}</h4>
                                         </div>
-                                    </div>
-                                </div>
-                            </button>
-                        </SwipeAction>
-                    )) : (
+                                        <ChevronRight className="w-5 h-5 text-brand-muted group-hover:text-brand-dark transition-colors" />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {tasks.length === 0 && (
                         <div className="p-20 text-center glass-card rounded-[48px] opacity-20 border-2 border-dashed border-brand-border">
                             <Ship className="w-16 h-16 mx-auto mb-6 text-brand-muted" />
                             <p className="text-xs font-black uppercase tracking-[0.4em] text-brand-muted">Manifesto Vazio</p>
@@ -595,7 +648,7 @@ const HomeGuide: React.FC<HomeGuideProps> = ({
                                         <div key={alert.id} className={`p-5 rounded-2xl border ${alert.type === 'DANGER' ? 'bg-red-500/10 border-red-500/30' : (alert.type === 'INFO' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-brand-gold/10 border-brand-gold/30')}`}>
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="flex items-center gap-2">
-                                                    {alert.type === 'DANGER' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : (alert.type === 'INFO' ? <InfoIcon className="w-4 h-4 text-blue-500" /> : <Ship className="w-4 h-4 text-brand-gold" />)}
+                                                    {alert.type === 'DANGER' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : (alert.type === 'INFO' ? <Info className="w-4 h-4 text-blue-500" /> : <Ship className="w-4 h-4 text-brand-gold" />)}
                                                     <span className={`text-[10px] font-black tracking-widest uppercase ${alert.type === 'DANGER' ? 'text-red-500' : (alert.type === 'INFO' ? 'text-blue-500' : 'text-brand-gold')}`}>
                                                         {alert.type}
                                                     </span>
