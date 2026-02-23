@@ -64,6 +64,24 @@ export interface LogisticsTaskEntry {
   champagneStock?: number;
   notes?: string;
 }
+
+export interface NavigationNotice {
+  id: string;
+  source: 'APDL' | 'IH' | 'SISTEMA';
+  title: string;
+  description: string;
+  severity: 'NORMAL' | 'ALERT' | 'CRITICAL';
+  type: 'ECLUSA' | 'CAUDAL' | 'AVISO' | 'METEO';
+  timestamp: string;
+  link?: string;
+}
+
+export interface NavStatus {
+  riverStatus: 'OPEN' | 'CAUTION' | 'CLOSED';
+  lastAIGeneration: string;
+  summary: string;
+  notices: NavigationNotice[];
+}
 // ----------------------------------------
 
 export interface Boat {
@@ -110,6 +128,19 @@ export interface ServiceTask {
   waterLevelOk?: boolean;
   waterPhotoTaken?: boolean;
   completedSteps?: string[];
+
+  // Catering exhaustive
+  hasTasting?: boolean;
+  hasLunch?: boolean;
+  lunchLocation?: string; // Foz, Rosa, LBV
+  extraDrinks?: string[]; // Murganheira, White Port, etc
+  hasPastries?: boolean; // Natas
+
+  // Logistics & Payments
+  requiresCollection?: boolean;
+  collectionAmount?: number;
+  collectionMethod?: 'CASH' | 'CARD' | 'MIXED' | 'PENDING';
+  partnerId?: string;
 }
 
 export interface KnowledgeArticle {

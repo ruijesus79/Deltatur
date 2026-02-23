@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ServiceTask, UserProfile, AppView, WeatherConditions, Boat, StaffMember, LogisticsTaskEntry, LogisticsTaskType } from '../types';
+import { ServiceTask, UserProfile, AppView, WeatherConditions, Boat, StaffMember, LogisticsTaskEntry, LogisticsTaskType, NavStatus } from '../types';
 import {
     Ship, ChevronRight, Waves, Zap, AlertTriangle, ShieldCheck,
     Thermometer, Wind, RefreshCw, Loader2, Info, Navigation2,
-    Map as MapIcon, Calendar, Clock, Users, MapPin,
+    Map as MapIcon, Calendar, Clock, Users, MapPin, Phone,
     FileText, ExternalLink, Siren, CloudSun, Radar, Wine, User, Anchor, FileWarning, CheckSquare, Camera, CheckCircle, X, Droplets, MessageCircle, Radio
 } from 'lucide-react';
 import { getLiveWeatherAndRiverConditions, getPredictiveRiverSafety } from '../services/geminiService';
@@ -22,9 +22,16 @@ interface HomeGuideProps {
     onUpdateFleet?: (f: Boat[]) => void;
     logisticsRegistry?: LogisticsTaskEntry[];
     onUpdateLogistics?: (items: LogisticsTaskEntry[]) => void;
+    navStatus: NavStatus | null;
+    isUpdatingNav: boolean;
+    onRefreshNav: () => void;
 }
 
-const HomeGuide: React.FC<HomeGuideProps> = ({ user, tasks, onNavigate, fleet = [], team = [], onUpdateFleet, logisticsRegistry = [], onUpdateLogistics }) => {
+const HomeGuide: React.FC<HomeGuideProps> = ({
+    user, tasks, onNavigate, fleet = [], team = [], onUpdateFleet,
+    logisticsRegistry = [], onUpdateLogistics,
+    navStatus, isUpdatingNav, onRefreshNav
+}) => {
     const [weather, setWeather] = useState<WeatherConditions | null>(null);
     const [loading, setLoading] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
@@ -120,6 +127,9 @@ const HomeGuide: React.FC<HomeGuideProps> = ({ user, tasks, onNavigate, fleet = 
 
     useEffect(() => {
         fetchData();
+        if (!navStatus && !isUpdatingNav) {
+            onRefreshNav();
+        }
         const hour = new Date().getHours();
         if (hour >= 18 || hour <= 7) {
             setIsSunsetMode(true);
@@ -272,10 +282,13 @@ const HomeGuide: React.FC<HomeGuideProps> = ({ user, tasks, onNavigate, fleet = 
                             <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner">
                                 <Radar className="w-7 h-7 text-brand-gold" />
                             </div>
-                            <div>
-                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Deltatur Digital Cockpit</p>
-                                <h4 className="text-base font-bold text-white/90">
-                                    {nextTask ? `Próximo: ${nextTask.time} • ${nextTask.boat}` : 'Aguardando Escala'}
+                            <div className="flex-1">
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30 mb-1 flex items-center gap-2">
+                                    Inteligência Náutica IA
+                                    {isUpdatingNav && <Loader2 className="w-3 h-3 animate-spin text-brand-gold" />}
+                                </p>
+                                <h4 className="text-sm font-bold text-white/90 leading-tight">
+                                    {navStatus?.summary || "Sincronizando editais da via navegável..."}
                                 </h4>
                             </div>
                         </div>
@@ -311,11 +324,16 @@ const HomeGuide: React.FC<HomeGuideProps> = ({ user, tasks, onNavigate, fleet = 
                                 </div>
                             </div>
                             {/* Scanning Radar */}
-                            <div className="relative w-14 h-14 bg-black/40 rounded-full overflow-hidden border border-brand-gold/20 hidden sm:flex items-center justify-center shadow-inner">
-                                <div className="absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0%,rgba(197,160,40,0.3)_15%,transparent_16%)] animate-radar-sweep"></div>
+                            <button
+                                onClick={onRefreshNav}
+                                disabled={isUpdatingNav}
+                                className="relative w-14 h-14 bg-black/40 rounded-full overflow-hidden border border-brand-gold/20 flex items-center justify-center shadow-inner hover:bg-brand-gold/10 transition-colors"
+                                title="Sincronizar IA"
+                            >
+                                <div className={`absolute inset-0 bg-[conic-gradient(from_0deg,transparent_0%,rgba(197,160,40,0.3)_15%,transparent_16%)] ${isUpdatingNav ? 'animate-radar-sweep' : ''}`}></div>
                                 <div className="absolute inset-0 border border-white/5 rounded-full scale-75"></div>
-                                <div className="absolute w-1.5 h-1.5 bg-brand-gold rounded-full blur-[2px] top-1/3 left-1/4 animate-pulse"></div>
-                            </div>
+                                <RefreshCw className={`w-4 h-4 text-brand-gold relative z-10 ${isUpdatingNav ? 'animate-spin' : ''}`} />
+                            </button>
                         </div>
                     </div>
 

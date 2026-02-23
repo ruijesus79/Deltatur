@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { OperationalEntry, WeatherConditions, ServiceTask } from "../types";
+import { OperationalEntry, WeatherConditions, ServiceTask, NavStatus, NavigationNotice } from "../types";
 
 const MODELS = {
   FAST_TEXT: 'gemini-3-flash-preview',
@@ -240,6 +240,13 @@ export const parseVoiceTask = async (transcription: string): Promise<Partial<Ser
             type: { type: Type.STRING },
             estimatedValue: { type: Type.NUMBER },
             notes: { type: Type.STRING },
+            hasTasting: { type: Type.BOOLEAN },
+            hasLunch: { type: Type.BOOLEAN },
+            hasPastries: { type: Type.BOOLEAN },
+            requiresCollection: { type: Type.BOOLEAN },
+            collectionAmount: { type: Type.NUMBER },
+            collectionMethod: { type: Type.STRING },
+            partnerId: { type: Type.STRING },
             crew: {
               type: Type.OBJECT,
               properties: {
@@ -426,4 +433,75 @@ export const generateVideo = async (prompt: string): Promise<string> => {
   }
   const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
   return `${downloadLink}&key=${process.env.API_KEY}`;
+};
+
+/**
+ * Inteligência de Navegação: Extração e Síntese de Avisos (APDL & IH) via Grounding.
+ */
+export const getNavigationNotices = async (): Promise<NavStatus> => {
+  const prompt = `
+    ÉRES O OFICIAL DE NAVEGAÇÃO DA DELTATUR.
+    TAREFA: Pesquisa em tempo real nos sites douro.apdl.pt e hidrografico.pt.
+    
+    DIRETRIZES TÉCNICAS (CONHECIMENTO ESTÁTICO APDL):
+    - Eclusas: Crestuma (KM 21.6), Carrapatelo (KM 71.4), Bagaúste (KM 125.2), Valeira (KM 173.2), Pocinho (KM 208.7).
+    - Horário de Navegação: 08:00 às 19:00 (Sazonal).
+    - Emergência: Capitania Douro (+351 222 070 970), Polícia Marítima (+351 916 352 918).
+    
+    NECESSITO DE:
+    1. Estado atual das Eclusas (especialmente Valeira e Bagaúste).
+    2. Caudais atuais e previsões.
+    3. Avisos aos Navegantes recentes (últimos 7 dias).
+    4. Restrições no canal do Pinhão.
+    
+    CRUZA A PESQUISA COM O CONHECIMENTO ESTÁTICO (ex: avisa se houver restrições no horário ou atrasos nas eclusas citadas).
+    
+    ESTRUTURA A RESPOSTA EM JSON (NavStatus):
+    {
+      "riverStatus": "OPEN" | "CAUTION" | "CLOSED",
+      "summary": "Resumo executivo de 2 frases sobre a segurança hoje",
+      "lastAIGeneration": "${new Date().toISOString()}",
+      "notices": [
+        {
+          "id": "string",
+          "source": "APDL" | "IH",
+          "title": "Título Curto",
+          "description": "Detalhes técnicos",
+          "severity": "NORMAL" | "ALERT" | "CRITICAL",
+          "type": "ECLUSA" | "CAUDAL" | "AVISO" | "METEO",
+          "timestamp": "ISO Date",
+          "link": "URL original se disponível"
+        }
+      ]
+    }
+  `;
+
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const response = await ai.models.generateContent({
+      model: MODELS.PRO_TEXT,
+      contents: { parts: [{ text: prompt }] },
+      config: {
+        tools: [{ googleSearch: {} }],
+        responseMimeType: "application/json",
+        thinkingConfig: { thinkingBudget: 8000 }
+      }
+    });
+
+    const data = JSON.parse(response.text || "{}");
+    return {
+      riverStatus: data.riverStatus || 'OPEN',
+      summary: data.summary || "Sem avisos críticos detetados. Navegação normal.",
+      lastAIGeneration: new Date().toLocaleTimeString(),
+      notices: data.notices || []
+    };
+  } catch (e) {
+    console.error("Error in getNavigationNotices", e);
+    return {
+      riverStatus: 'OPEN',
+      summary: "Informação offline. Consulte as autoridades locais. Padrão Delta Seguro ativo.",
+      lastAIGeneration: "Offline",
+      notices: []
+    };
+  }
 };

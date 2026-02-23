@@ -1,7 +1,7 @@
 
 // App.tsx: Gestor Central de Estado e Navegação
 import React, { useState, useEffect } from 'react';
-import { AppView, UserProfile, ServiceTask, Boat, KnowledgeArticle, GalleryImage, AppNotification, DocumentResource, StaffMember, EmergencyContact, LogisticsTaskEntry } from './types';
+import { AppView, UserProfile, ServiceTask, Boat, KnowledgeArticle, GalleryImage, AppNotification, DocumentResource, StaffMember, EmergencyContact, LogisticsTaskEntry, NavStatus } from './types';
 import Login from './views/Login';
 import HomeLanding from './views/HomeLanding';
 import HomeGuide from './views/HomeGuide';
@@ -17,6 +17,7 @@ import { Home, Info, DollarSign, Menu, X, Settings, LogOut, Shield, Bell, CheckC
 import { BrandLogo } from './components/BrandLogo';
 import { INITIAL_FLEET, INITIAL_TEAM, INITIAL_GUIDES, PARTNERS, SERVICE_TYPES, INITIAL_KNOWLEDGE_BASE, INITIAL_GALLERY, INITIAL_EMERGENCY_CONTACTS } from './data/companyData';
 import { mediaDB } from './services/storageService';
+import { getNavigationNotices } from './services/geminiService';
 
 const INITIAL_TASKS: ServiceTask[] = [
     {
@@ -56,6 +57,10 @@ const App: React.FC = () => {
     const [documents, setDocuments] = useState<DocumentResource[]>([]);
     const [selectedTask, setSelectedTask] = useState<ServiceTask | null>(null);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+    // Navigation Intelligence Shared State
+    const [navStatus, setNavStatus] = useState<NavStatus | null>(null);
+    const [isUpdatingNav, setIsUpdatingNav] = useState(false);
 
     const pushNotification = (title: string, message: string, type: 'INFO' | 'ALERT' | 'SUCCESS' = 'INFO') => {
         const newNotif: AppNotification = {
@@ -182,6 +187,20 @@ const App: React.FC = () => {
         localStorage.setItem('deltatur_db_logistics', JSON.stringify(items));
     };
 
+    const fetchNavNotices = async () => {
+        setIsUpdatingNav(true);
+        try {
+            const data = await getNavigationNotices();
+            setNavStatus(data);
+            pushNotification("Inteligência Douro", "Dados sintetizados com sucesso através de IA.", "SUCCESS");
+        } catch (e) {
+            console.error(e);
+            pushNotification("Erro de Sincronização", "Não foi possível contactar o motor de IA.", "ALERT");
+        } finally {
+            setIsUpdatingNav(false);
+        }
+    };
+
     const handleLogin = (loggedInUser: UserProfile) => {
         setUser(loggedInUser);
         setCurrentView(loggedInUser.role === 'ADMIN' ? AppView.ADMIN_DASHBOARD : AppView.HOME);
@@ -205,8 +224,11 @@ const App: React.FC = () => {
                     fleet={fleet}
                     team={team}
                     onUpdateFleet={setFleet}
-                    logisticsRegistry={logisticsRegistry} // Passar Registo
-                    onUpdateLogistics={updateLogistics} // Passar função de update
+                    logisticsRegistry={logisticsRegistry}
+                    onUpdateLogistics={updateLogistics}
+                    navStatus={navStatus}
+                    isUpdatingNav={isUpdatingNav}
+                    onRefreshNav={fetchNavNotices}
                 />
             );
             case AppView.ADMIN_DASHBOARD:
@@ -214,12 +236,15 @@ const App: React.FC = () => {
                     <AdminDashboard
                         tasks={tasks} fleet={fleet} team={team} guides={guides} partners={partners}
                         serviceTypes={serviceTypes} knowledgeBase={knowledgeBase} gallery={gallery} documents={documents}
-                        logisticsRegistry={logisticsRegistry} // Novo Prop
+                        logisticsRegistry={logisticsRegistry}
+                        navStatus={navStatus}
+                        isUpdatingNav={isUpdatingNav}
+                        onRefreshNav={fetchNavNotices}
                         onAddTask={t => setTasks(prev => [...prev, t])} onUpdateTask={t => setTasks(prev => prev.map(old => old.id === t.id ? t : old))}
                         onDeleteTask={id => setTasks(prev => prev.filter(t => t.id !== id))} onUpdateFleet={setFleet} onUpdateTeam={setTeam}
                         onUpdateGuides={setGuides} onUpdatePartners={setPartners} onUpdateServiceTypes={setServiceTypes}
                         onUpdateKB={updateKB} onUpdateGallery={updateGallery} onUpdateDocuments={updateDocuments}
-                        onUpdateLogistics={updateLogistics} // Novo Prop
+                        onUpdateLogistics={updateLogistics}
                         onNavigate={setCurrentView} notify={pushNotification}
                     />
                 );
@@ -230,6 +255,9 @@ const App: React.FC = () => {
                         serviceTypes={serviceTypes} knowledgeBase={knowledgeBase} gallery={gallery} documents={documents}
                         logisticsRegistry={logisticsRegistry}
                         initialTab="CONFIG"
+                        navStatus={navStatus}
+                        isUpdatingNav={isUpdatingNav}
+                        onRefreshNav={fetchNavNotices}
                         onAddTask={t => setTasks(prev => [...prev, t])} onUpdateTask={t => setTasks(prev => prev.map(old => old.id === t.id ? t : old))}
                         onDeleteTask={id => setTasks(prev => prev.filter(t => t.id !== id))} onUpdateFleet={setFleet} onUpdateTeam={setTeam}
                         onUpdateGuides={setGuides} onUpdatePartners={setPartners} onUpdateServiceTypes={setServiceTypes}
@@ -278,6 +306,7 @@ const App: React.FC = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setIsMenuOpen(true)}
+                        title="Abrir Menu"
                         className="hidden md:flex p-2.5 bg-brand-bg hover:bg-white rounded-2xl border border-brand-border/50 text-brand-muted hover:text-brand-primary transition-all shadow-sm active:scale-95 items-center justify-center"
                     >
                         <Menu className="w-6 h-6" />
@@ -291,7 +320,7 @@ const App: React.FC = () => {
                     <div className="relative w-full max-w-[320px] bg-white h-full shadow-2xl flex flex-col animate-slideInRight">
                         <div className="p-8 border-b border-brand-border/50 flex items-center justify-between bg-brand-bg/30">
                             <div><p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest mb-1">Navegação</p><h3 className="text-xl font-roboto font-bold text-brand-dark">Menu Principal</h3></div>
-                            <button onClick={() => setIsMenuOpen(false)} className="p-2 hover:bg-white rounded-full text-brand-muted transition-colors"><X className="w-6 h-6" /></button>
+                            <button onClick={() => setIsMenuOpen(false)} title="Fechar Menu" className="p-2 hover:bg-white rounded-full text-brand-muted transition-colors"><X className="w-6 h-6" /></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                             <p className="px-4 py-2 text-[10px] font-bold text-brand-muted uppercase tracking-[0.2em] mt-4">Operações</p>

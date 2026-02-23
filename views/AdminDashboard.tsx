@@ -6,9 +6,11 @@ import {
 import {
     Plus, Calendar, Users, Ship, Settings, Trash2, Edit2,
     Save, X, ShieldCheck, Lock, Loader2, Briefcase, Tag, UserPlus, Anchor, CheckCircle, AlertTriangle, Clock, FileText, UserCheck, MessageSquare, Info, Play, ExternalLink, Navigation2, Zap, Phone, Mail,
-    Thermometer, Wind, Waves, RefreshCw, ArrowUpRight, ArrowDownRight, Droplets, Camera, CheckSquare, List, MessageCircle, Mic, StopCircle
+    Thermometer, Wind, Waves, RefreshCw, ArrowUpRight, ArrowDownRight, Droplets, Camera, CheckSquare, List, MessageCircle, Mic, StopCircle, Radio, Map
 } from 'lucide-react';
-import { getLiveWeatherAndRiverConditions, transcribeAudio, parseVoiceTask } from '../services/geminiService';
+import { motion, AnimatePresence } from 'framer-motion';
+import { getLiveWeatherAndRiverConditions, transcribeAudio, parseVoiceTask, getNavigationNotices } from '../services/geminiService';
+import { NavStatus } from '../types';
 
 interface AdminDashboardProps {
     tasks: ServiceTask[];
@@ -21,7 +23,10 @@ interface AdminDashboardProps {
     gallery: GalleryImage[];
     documents: DocumentResource[];
     logisticsRegistry?: LogisticsTaskEntry[];
-    initialTab?: 'AGENDA' | 'EQUIPA' | 'FROTA' | 'CONFIG' | 'LOGISTICA';
+    initialTab?: 'AGENDA' | 'EQUIPA' | 'FROTA' | 'CONFIG' | 'LOGISTICA' | 'NAVEGACAO';
+    navStatus: NavStatus | null;
+    isUpdatingNav: boolean;
+    onRefreshNav: () => void;
     onAddTask: (t: ServiceTask) => void;
     onUpdateTask: (t: ServiceTask) => void;
     onDeleteTask: (id: string) => void;
@@ -41,9 +46,14 @@ interface AdminDashboardProps {
 const AdminDashboard: React.FC<AdminDashboardProps> = ({
     tasks, fleet, team, guides, partners, serviceTypes, initialTab = 'AGENDA', logisticsRegistry = [],
     onAddTask, onUpdateTask, onDeleteTask, onUpdateFleet, onUpdateTeam,
-    onUpdatePartners, onUpdateServiceTypes, onUpdateLogistics, notify
+    onUpdatePartners, onUpdateServiceTypes, onUpdateLogistics,
+    navStatus,
+    isUpdatingNav,
+    onRefreshNav,
+    onNavigate,
+    notify
 }) => {
-    const [activeTab, setActiveTab] = useState<'AGENDA' | 'EQUIPA' | 'FROTA' | 'CONFIG' | 'LOGISTICA'>(initialTab);
+    const [activeTab, setActiveTab] = useState<'AGENDA' | 'EQUIPA' | 'FROTA' | 'CONFIG' | 'LOGISTICA' | 'NAVEGACAO'>(initialTab);
     const [isAddingTask, setIsAddingTask] = useState(false);
     const [editingTask, setEditingTask] = useState<ServiceTask | null>(null);
     const [isAddingResource, setIsAddingResource] = useState<'STAFF' | 'BOAT' | 'PARTNER' | 'TYPE' | null>(null);
@@ -66,6 +76,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const [newLogisticsType, setNewLogisticsType] = useState<LogisticsTaskType>('PREP_BARCO');
     const [newLogisticsStaffId, setNewLogisticsStaffId] = useState('');
     const [newLogisticsNotes, setNewLogisticsNotes] = useState(''); // Estado para notas logísticas
+
     const [viewingLogisticsEntry, setViewingLogisticsEntry] = useState<LogisticsTaskEntry | null>(null);
 
     // VOICE RECORDING STATES
@@ -73,6 +84,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const [isParsingVoice, setIsParsingVoice] = useState(false);
     const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
     const audioChunksRef = React.useRef<Blob[]>([]);
+
+    const [isAuthoritiesModalOpen, setIsAuthoritiesModalOpen] = useState(false);
 
     useEffect(() => {
         setActiveTab(initialTab);
@@ -90,6 +103,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         } catch (e) { console.error(e); }
         finally { setLoadingWeather(false); }
     };
+
+    // Navigation Intelligence (LIFTED TO APP.TSX)
+
+    useEffect(() => {
+        if (activeTab === 'NAVEGACAO' && !navStatus && !isUpdatingNav) {
+            onRefreshNav();
+        }
+    }, [activeTab, navStatus, isUpdatingNav, onRefreshNav]);
 
     // Service Form State
     const [newTask, setNewTask] = useState<Partial<ServiceTask>>({
@@ -339,738 +360,1162 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     return (
         <div className="space-y-6 pb-24 animate-fadeIn">
-            {/* 1. TOP ACTION CENTER & TELEMETRY */}
-            <div className="bg-brand-primary rounded-[40px] p-8 md:p-12 text-white shadow-spatial relative overflow-hidden flex flex-col xl:flex-row gap-8 items-stretch group transition-all duration-500 hover:shadow-2xl hover:-translate-y-1">
-                <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:scale-110 transition-transform duration-1000">
-                    <Ship className="w-96 h-96 text-brand-gold" />
-                </div>
+            <div className="relative min-h-screen bg-[#070b14] flex flex-col md:flex-row overflow-hidden font-sans selection:bg-brand-gold/30 selection:text-white">
 
-                {/* HEADER LEFT */}
-                <div className="flex-1 flex flex-col justify-center relative z-10 min-w-[300px]">
-                    <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter leading-none">Centro de Comando</h1>
-                    <p className="text-brand-gold text-[10px] font-black uppercase tracking-[0.4em] mt-3">Deltatur Operational Intelligence</p>
+                {/* GRAIN TEXTURE OVERLAY */}
+                <div className="absolute inset-0 z-[5] opacity-[0.06] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
 
-                    <div className="mt-8 flex items-center gap-4">
-                        <button
-                            onClick={() => {
-                                setIsAddingTask(true);
-                                setEditingTask(null);
-                                setNewTask({
-                                    time: '10:00',
-                                    clientName: '',
-                                    pax: 2,
-                                    isPrivate: true,
-                                    status: 'PENDING',
-                                    notes: '',
-                                    crew: { condutor: '', assistente: '', guia: '' }
-                                });
-                            }}
-                            className="w-fit px-8 py-4 bg-brand-gold text-white rounded-full font-bold text-sm flex items-center justify-center gap-3 shadow-glass hover:shadow-spatial hover:-translate-y-0.5 transition-all duration-300"
-                            aria-label="Criar Novo Passeio"
-                            title="Criar Novo Passeio"
-                        >
-                            <Plus className="w-5 h-5" /> Novo Passeio
-                        </button>
+                {/* SIDEBAR */}
+                <div className="relative z-10 w-full md:w-80 bg-[#0A101C]/80 backdrop-blur-xl border-r border-white/10 flex flex-col shadow-2xl shrink-0">
+                    <div className="p-8 flex items-center justify-between border-b border-white/10">
+                        <div>
+                            <h2 className="text-2xl font-black tracking-tighter uppercase text-white">Deltatur</h2>
+                            <span className="text-[10px] font-black tracking-[0.2em] text-brand-gold uppercase bg-brand-gold/10 px-2 py-1 rounded">OS</span>
+                        </div>
+                    </div>
 
-                        <button
-                            onClick={isRecording ? stopRecording : startRecording}
-                            disabled={isParsingVoice}
-                            className={`w-fit px-6 py-4 rounded-full font-bold text-sm flex items-center justify-center gap-3 shadow-glass hover:shadow-spatial hover:-translate-y-0.5 transition-all duration-300 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-brand-gold hover:bg-white/20'}`}
-                            title="Gravar Missão (Inteligência Artificial)"
-                        >
-                            {isParsingVoice ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                            {isParsingVoice ? 'A Analisar...' : isRecording ? 'A Gravar...' : 'Gravar Missão'}
-                        </button>
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar flex flex-col">
+                        <div className="p-6 md:p-8 mt-4 border-t border-white/10 text-center">
+                            <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] mb-1">Deltatur Digital</p>
+                            <p className="font-bold text-xs text-brand-gold">Modo Administrador</p>
+                        </div>
+
+                        <nav className="flex-1 space-y-2 py-6 px-4">
+                            {[
+                                { id: 'AGENDA', label: 'Agenda Central', icon: Calendar },
+                                { id: 'NAVEGACAO', label: 'Inteligência Náutica', icon: Map },
+                                { id: 'LOGISTICA', label: 'Manutenção & Logística', icon: CheckSquare },
+                                { id: 'EQUIPA', label: 'Gestão de Tripulação', icon: Users },
+                                { id: 'FROTA', label: 'Controlo de Frota', icon: Ship },
+                                { id: 'CONFIG', label: 'Configurações', icon: Settings }
+                            ].map(tab => {
+                                const Icon = tab.icon;
+                                const isActive = activeTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all font-bold ${isActive ? 'bg-brand-gold/10 text-brand-gold shadow-lg shadow-brand-gold/10 border border-brand-gold/20' : 'bg-transparent text-white/40 hover:bg-white/5 hover:text-white'}`}
+                                    >
+                                        <Icon className="w-5 h-5" /> {tab.label}
+                                    </button>
+                                );
+                            })}
+                        </nav>
+
+                        <div className="p-8 border-t border-white/10 mt-auto">
+                            <button onClick={() => onNavigate(AppView.LANDING)} className="flex items-center gap-4 text-white/40 hover:text-brand-gold group transition-colors w-full">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-brand-gold/10 transition-colors border border-transparent group-hover:border-brand-gold/20">
+                                    <Lock className="w-5 h-5" />
+                                </div>
+                                <span className="font-bold text-sm tracking-wide">Bloquear Sessão</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
-                {/* TELEMETRY GRID */}
-                <div className="flex-[2] bg-white/5 rounded-[24px] p-6 border border-white/10 relative z-10 backdrop-blur-md flex flex-col justify-between">
-                    <div className="flex justify-between items-center mb-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-2">
-                            <Zap className="w-3 h-3 text-brand-gold" /> Telemetria Pinhão (Live)
-                        </p>
-                        <button onClick={fetchTelemetry} disabled={loadingWeather} className="p-2 hover:bg-white/10 rounded-full transition-all" title="Atualizar Telemetria" aria-label="Atualizar Telemetria">
-                            {loadingWeather ? <Loader2 className="w-4 h-4 animate-spin text-brand-gold" /> : <RefreshCw className="w-4 h-4 text-white/50 hover:text-white" />}
-                        </button>
-                    </div>
+                {/* MAIN CONTENT AREA */}
+                <div className="relative z-10 flex-1 h-screen overflow-y-auto custom-scrollbar">
+                    <div className="p-6 md:p-12 md:max-w-7xl mx-auto space-y-8 animate-fadeIn">
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                            <div className="flex justify-center mb-2"><Thermometer className="w-5 h-5 text-brand-gold" /></div>
-                            <p className="text-xl font-mono font-bold">{weather?.temp ?? '--'}º</p>
-                            <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Temp</p>
-                        </div>
-
-                        <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                            <div className="flex justify-center mb-2"><Wind className="w-5 h-5 text-brand-gold" /></div>
-                            <div className="flex items-center justify-center gap-1">
-                                <p className="text-xl font-mono font-bold">{weather?.windSpeed ?? '--'}</p>
-                                <span className="text-[9px] text-white/40">{weather?.windDirection}</span>
+                        {/* 1. TOP ACTION CENTER & TELEMETRY */}
+                        <div className="bg-white/5 backdrop-blur-md rounded-[40px] p-8 md:p-12 border border-white/10 text-white shadow-spatial relative overflow-hidden flex flex-col xl:flex-row gap-8 items-stretch group transition-all duration-500">
+                            <div className="absolute top-0 right-0 p-12 opacity-[0.03] group-hover:scale-110 transition-transform duration-1000">
+                                <Ship className="w-96 h-96 text-white" />
                             </div>
-                            <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Vento (km/h)</p>
-                        </div>
 
-                        <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                            <div className="flex justify-center mb-2"><Waves className="w-5 h-5 text-brand-gold" /></div>
-                            <p className="text-xl font-mono font-bold">{weather?.dams?.[0]?.dischargeRate ?? '--'}</p>
-                            <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Barragens</p>
-                        </div>
+                            {/* HEADER LEFT */}
+                            <div className="flex-1 flex flex-col justify-center relative z-10 min-w-[300px]">
+                                <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter leading-none text-white">Centro de Comando</h1>
+                                <p className="text-brand-gold text-[10px] font-black uppercase tracking-[0.4em] mt-3">Deltatur Operational Intelligence</p>
 
-                        <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                            <div className="flex justify-center mb-2">
-                                {weather?.tideTrend === 'SUBIR' ? <ArrowUpRight className="w-5 h-5 text-red-400" /> : <ArrowDownRight className="w-5 h-5 text-green-400" />}
-                            </div>
-                            <p className="text-xl font-mono font-bold">{weather?.tideHeight ?? 'Normal'}</p>
-                            <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Nível Rio</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* 2. NAVIGATION BAR */}
-            <div className="bg-white p-2 rounded-full border border-brand-border shadow-glass flex overflow-x-auto no-scrollbar gap-2">
-                {[
-                    { id: 'AGENDA', label: 'Agenda & Escala', icon: Calendar },
-                    { id: 'LOGISTICA', label: 'Logística & Ops', icon: CheckSquare },
-                    { id: 'EQUIPA', label: 'Equipa', icon: Users },
-                    { id: 'FROTA', label: 'Frota', icon: Ship },
-                    { id: 'CONFIG', label: 'Configurações', icon: Settings },
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-full text-xs font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-brand-gold text-white shadow-md' : 'bg-transparent text-brand-text hover:bg-brand-light'}`}
-                    >
-                        <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-white' : 'text-brand-muted'}`} /> {tab.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* 3. DYNAMIC CONTENT */}
-            <div className="animate-fadeIn">
-
-                {/* LOGÍSTICA & OPS TAB */}
-                {activeTab === 'LOGISTICA' && (
-                    <div className="space-y-6">
-
-                        {/* CONTROLOS DE CRIAÇÃO */}
-                        <div className="bg-white p-8 rounded-[40px] border border-brand-border shadow-sm">
-                            <div className="flex flex-col md:flex-row gap-6 items-end mb-4">
-                                <div className="flex-1 space-y-2 w-full">
-                                    <label htmlFor="logisticsDate" className="text-[9px] font-bold text-brand-muted uppercase tracking-widest ml-1">Data da Missão</label>
-                                    <input
-                                        id="logisticsDate"
-                                        type="date"
-                                        title="Data da Missão"
-                                        value={logisticsDate}
-                                        onChange={(e) => setLogisticsDate(e.target.value)}
-                                        className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm font-bold text-brand-dark outline-none focus:border-brand-primary"
-                                    />
-                                </div>
-                                <div className="flex-1 space-y-2 w-full">
-                                    <label htmlFor="logisticsBoat" className="text-[9px] font-bold text-brand-muted uppercase tracking-widest ml-1">Embarcação</label>
-                                    <select
-                                        id="logisticsBoat"
-                                        title="Selecionar Embarcação"
-                                        value={newLogisticsBoatId}
-                                        onChange={(e) => setNewLogisticsBoatId(e.target.value)}
-                                        className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm font-bold text-brand-dark outline-none focus:border-brand-primary"
+                                <div className="mt-8 flex items-center gap-4">
+                                    <button
+                                        onClick={() => {
+                                            setIsAddingTask(true);
+                                            setEditingTask(null);
+                                            setNewTask({
+                                                time: '10:00',
+                                                clientName: '',
+                                                pax: 2,
+                                                isPrivate: true,
+                                                status: 'PENDING',
+                                                notes: '',
+                                                crew: { condutor: '', assistente: '', guia: '' }
+                                            });
+                                        }}
+                                        className="w-fit px-8 py-4 bg-brand-gold text-[#0A101C] rounded-full font-bold text-sm flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(212,175,55,0.2)] hover:shadow-[0_10px_40px_rgba(212,175,55,0.4)] hover:-translate-y-0.5 transition-all duration-300"
+                                        aria-label="Criar Novo Passeio"
+                                        title="Criar Novo Passeio"
                                     >
-                                        <option value="">Selecionar Barco...</option>
-                                        {fleet.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="flex-1 space-y-2 w-full">
-                                    <label htmlFor="logisticsType" className="text-[9px] font-bold text-brand-muted uppercase tracking-widest ml-1">Tipo de Tarefa</label>
-                                    <select
-                                        id="logisticsType"
-                                        title="Selecionar Tipo de Tarefa"
-                                        value={newLogisticsType}
-                                        onChange={(e) => setNewLogisticsType(e.target.value as LogisticsTaskType)}
-                                        className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm font-bold text-brand-dark outline-none focus:border-brand-primary"
+                                        <Plus className="w-5 h-5" /> Novo Passeio
+                                    </button>
+
+                                    <button
+                                        onClick={isRecording ? stopRecording : startRecording}
+                                        disabled={isParsingVoice}
+                                        className={`w-fit px-6 py-4 rounded-full font-bold text-sm flex items-center justify-center gap-3 shadow-glass hover:shadow-spatial hover:-translate-y-0.5 transition-all duration-300 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-brand-gold hover:bg-white/20'}`}
+                                        title="Gravar Missão (Inteligência Artificial)"
                                     >
-                                        <option value="PREP_BARCO">Preparação Geral (Manhã)</option>
-                                        <option value="DEGUSTACAO">Prep. Degustação</option>
-                                        <option value="ABASTECER_COMB">Abastecer Combustível</option>
-                                        <option value="ABASTECER_AGUA">Abastecer Água</option>
-                                        <option value="FECHO_COMPLETO">Fecho de Dia (Fotos Obrigatórias)</option>
-                                    </select>
-                                </div>
-                                <div className="flex-1 space-y-2 w-full">
-                                    <label htmlFor="logisticsStaff" className="text-[9px] font-bold text-brand-muted uppercase tracking-widest ml-1">Staff Responsável</label>
-                                    <select
-                                        id="logisticsStaff"
-                                        title="Selecionar Staff Responsável"
-                                        value={newLogisticsStaffId}
-                                        onChange={(e) => setNewLogisticsStaffId(e.target.value)}
-                                        className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm font-bold text-brand-dark outline-none focus:border-brand-primary"
-                                    >
-                                        <option value="">Selecionar Staff...</option>
-                                        {team.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                                    </select>
+                                        {isParsingVoice ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                                        {isParsingVoice ? 'A Analisar...' : isRecording ? 'A Gravar...' : 'Gravar Missão'}
+                                    </button>
                                 </div>
                             </div>
 
-                            <div className="flex flex-col md:flex-row gap-6 items-end">
-                                <div className="flex-[3] space-y-2 w-full">
-                                    <label htmlFor="logisticsNotes" className="text-[9px] font-bold text-brand-muted uppercase tracking-widest ml-1">Instruções Específicas</label>
-                                    <input
-                                        id="logisticsNotes"
-                                        title="Instruções Específicas"
-                                        type="text"
-                                        value={newLogisticsNotes}
-                                        onChange={(e) => setNewLogisticsNotes(e.target.value)}
-                                        placeholder="Ex: Levar 2 jarricas cheias; Verificar nível óleo motor direito..."
-                                        className="w-full bg-brand-bg border border-brand-border rounded-xl px-4 py-3 text-sm font-medium text-brand-dark outline-none focus:border-brand-primary"
-                                    />
+                            {/* TELEMETRY GRID */}
+                            <div className="flex-[2] bg-white/5 rounded-[24px] p-6 border border-white/10 relative z-10 backdrop-blur-md flex flex-col justify-between">
+                                <div className="flex justify-between items-center mb-4">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-2">
+                                        <Zap className="w-3 h-3 text-brand-gold" /> Telemetria Pinhão (Live)
+                                    </p>
+                                    <button onClick={fetchTelemetry} disabled={loadingWeather} className="p-2 hover:bg-white/10 rounded-full transition-all" title="Atualizar Telemetria" aria-label="Atualizar Telemetria">
+                                        {loadingWeather ? <Loader2 className="w-4 h-4 animate-spin text-brand-gold" /> : <RefreshCw className="w-4 h-4 text-white/50 hover:text-white" />}
+                                    </button>
                                 </div>
+
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
+                                        <div className="flex justify-center mb-2"><Thermometer className="w-5 h-5 text-brand-gold" /></div>
+                                        <p className="text-xl font-mono font-bold">{weather?.temp ?? '--'}º</p>
+                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Temp</p>
+                                    </div>
+
+                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
+                                        <div className="flex justify-center mb-2"><Wind className="w-5 h-5 text-brand-gold" /></div>
+                                        <div className="flex items-center justify-center gap-1">
+                                            <p className="text-xl font-mono font-bold">{weather?.windSpeed ?? '--'}</p>
+                                            <span className="text-[9px] text-white/40">{weather?.windDirection}</span>
+                                        </div>
+                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Vento (km/h)</p>
+                                    </div>
+
+                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
+                                        <div className="flex justify-center mb-2"><Waves className="w-5 h-5 text-brand-gold" /></div>
+                                        <p className="text-xl font-mono font-bold">{weather?.dams?.[0]?.dischargeRate ?? '--'}</p>
+                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Barragens</p>
+                                    </div>
+
+                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
+                                        <div className="flex justify-center mb-2">
+                                            {weather?.tideTrend === 'SUBIR' ? <ArrowUpRight className="w-5 h-5 text-red-400" /> : <ArrowDownRight className="w-5 h-5 text-green-400" />}
+                                        </div>
+                                        <p className="text-xl font-mono font-bold">{weather?.tideHeight ?? 'Normal'}</p>
+                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Nível Rio</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. NAVIGATION BAR */}
+                        <div className="bg-white/5 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-glass flex overflow-x-auto no-scrollbar gap-2">
+                            {[
+                                { id: 'AGENDA', label: 'Agenda & Escala', icon: Calendar },
+                                { id: 'NAVEGACAO', label: 'Navegação IA', icon: Map },
+                                { id: 'LOGISTICA', label: 'Logística & Ops', icon: CheckSquare },
+                                { id: 'EQUIPA', label: 'Equipa', icon: Users },
+                                { id: 'FROTA', label: 'Frota', icon: Ship },
+                                { id: 'CONFIG', label: 'Configurações', icon: Settings },
+                            ].map(tab => (
                                 <button
-                                    onClick={addLogisticsTask}
-                                    className="flex-1 px-6 py-3.5 bg-brand-primary text-white rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg hover:scale-105 active:scale-95 transition-all mb-0.5"
-                                    aria-label="Adicionar Tarefa Logística"
-                                    title="Adicionar Tarefa Logística"
+                                    key={tab.id}
+                                    onClick={() => setActiveTab(tab.id as any)}
+                                    className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-full text-xs font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-brand-gold text-[#0A101C] shadow-md' : 'bg-transparent text-white/50 hover:bg-white/10 text-white'}`}
                                 >
-                                    Adicionar Tarefa
+                                    <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-[#0A101C]' : 'text-white/50'}`} /> {tab.label}
                                 </button>
-                            </div>
+                            ))}
                         </div>
 
-                        {/* LISTAGEM DE TAREFAS */}
-                        <div className="bg-white rounded-[40px] shadow-glass overflow-hidden">
-                            <div className="p-8 border-b border-brand-border text-center">
-                                <h3 className="text-xl font-bold text-brand-dark flex flex-col items-center justify-center gap-2">
-                                    Missões Logísticas
-                                    <span className="text-sm font-medium text-brand-muted bg-brand-light px-4 py-1 rounded-full">{logisticsDate}</span>
-                                </h3>
-                            </div>
+                        {/* 3. DYNAMIC CONTENT */}
+                        <div className="animate-fadeIn">
 
-                            {filteredLogistics.length === 0 ? (
-                                <div className="p-12 text-center text-brand-muted opacity-50">
-                                    <p className="text-xs font-bold uppercase tracking-widest">Nenhuma tarefa atribuída para este dia.</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-brand-border/50">
-                                    {fleet.map(boat => {
-                                        const boatTasks = filteredLogistics.filter(t => t.boatId === boat.id);
-                                        if (boatTasks.length === 0) return null;
+                            {/* NAVEGAÇÃO & INTELIGÊNCIA IA TAB */}
+                            {activeTab === 'NAVEGACAO' && (
+                                <div className="space-y-8 animate-fadeIn">
+                                    {/* CABEÇALHO DA TAB */}
+                                    <div className="bg-white/5 backdrop-blur-md p-10 rounded-[40px] border border-white/10 shadow-glass relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-12 opacity-[0.05] pointer-events-none">
+                                            <Map className="w-64 h-64 text-brand-gold" />
+                                        </div>
 
-                                        return (
-                                            <div key={boat.id} className="p-6 hover:bg-brand-bg/30 transition-colors">
-                                                <div className="flex items-center gap-3 mb-4">
-                                                    <Ship className="w-4 h-4 text-brand-primary" />
-                                                    <h4 className="font-black text-brand-dark uppercase">{boat.name}</h4>
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <div className={`w-3 h-3 rounded-full animate-pulse ${navStatus?.riverStatus === 'CLOSED' ? 'bg-red-500' : navStatus?.riverStatus === 'CAUTION' ? 'bg-brand-gold' : 'bg-green-500'}`} />
+                                                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Estado da Via Navegável</h3>
+                                            </div>
+
+                                            <p className="text-xl font-medium text-white/80 leading-relaxed max-w-2xl">
+                                                {isUpdatingNav ? "A IA está a consultar os editais da APDL e do Instituto Hidrográfico..." : navStatus?.summary}
+                                            </p>
+
+                                            <div className="mt-8 flex flex-wrap gap-4">
+                                                <button
+                                                    onClick={onRefreshNav}
+                                                    disabled={isUpdatingNav}
+                                                    className="px-8 py-4 bg-brand-gold text-[#0A101C] rounded-full font-bold text-sm flex items-center gap-3 hover:scale-105 active:scale-95 transition-all shadow-lg"
+                                                >
+                                                    {isUpdatingNav ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+                                                    {isUpdatingNav ? "Sincronizando..." : "Pesquisar Fontes Oficiais (IA Deep Scan)"}
+                                                </button>
+
+                                                <div className="flex items-center gap-4 px-6 py-4 bg-white/5 border border-white/10 rounded-full">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-white/40">Sincronização:</span>
+                                                    <span className="text-xs font-bold text-brand-gold">{navStatus?.lastAIGeneration || 'Nunca'}</span>
                                                 </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                    {boatTasks.map(task => {
-                                                        const assignee = team.find(t => t.id === task.staffId);
-                                                        const Icon = getTaskIcon(task.type);
+                                            </div>
+                                        </div>
+                                    </div>
 
-                                                        return (
-                                                            <div key={task.id} className={`p-4 rounded-2xl border flex flex-col gap-2 ${task.status === 'DONE' ? 'bg-green-50 border-green-100' : 'bg-white border-brand-border'}`}>
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className={`p-2 rounded-xl ${task.status === 'DONE' ? 'bg-green-200 text-green-700' : 'bg-brand-bg text-brand-muted'}`}>
-                                                                            <Icon className="w-4 h-4" />
-                                                                        </div>
-                                                                        <div>
-                                                                            <p className="text-xs font-bold text-brand-dark">{getTaskLabel(task.type)}</p>
-                                                                            <p className="text-[10px] font-medium text-brand-muted uppercase tracking-wider">{assignee?.name || 'Desconhecido'}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        {task.status === 'DONE' && task.type === 'FECHO_COMPLETO' && (
-                                                                            <button
-                                                                                onClick={() => setViewingLogisticsEntry(task)}
-                                                                                className="p-2 bg-white rounded-lg border border-green-200 text-green-600 hover:scale-110 transition-transform"
-                                                                                title="Ver Provas Logísticas"
-                                                                                aria-label="Ver Provas Logísticas"
-                                                                            >
-                                                                                <Camera className="w-3 h-3" />
-                                                                            </button>
-                                                                        )}
-                                                                        <button
-                                                                            onClick={() => deleteLogisticsTask(task.id)}
-                                                                            className="p-2 hover:bg-red-50 text-brand-muted hover:text-red-500 rounded-lg transition-colors"
-                                                                            title="Eliminar Tarefa Logística"
-                                                                            aria-label="Eliminar Tarefa Logística"
-                                                                        >
-                                                                            <Trash2 className="w-3 h-3" />
-                                                                        </button>
-                                                                    </div>
+                                    {/* LINKS RÁPIDOS (BACKUP) */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        {[
+                                            { label: 'Via Navegável (APDL)', url: 'https://douro.apdl.pt/', icon: Ship },
+                                            { label: 'Avisos aos Navegantes (IH)', url: 'https://avisos.hidrografico.pt/', icon: AlertTriangle },
+                                            { label: 'GeoAnavNet (Marinha)', url: 'https://geoanavnet.hidrografico.pt/', icon: Navigation2 }
+                                        ].map((link, i) => (
+                                            <a
+                                                key={i}
+                                                href={link.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="group bg-white/5 backdrop-blur-md p-6 rounded-3xl border border-white/10 flex items-center justify-between hover:bg-white/10 hover:border-brand-gold/30 transition-all"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-2xl bg-black/40 flex items-center justify-center text-brand-gold group-hover:scale-110 transition-transform">
+                                                        <link.icon className="w-5 h-5" />
+                                                    </div>
+                                                    <span className="text-xs font-black uppercase tracking-widest text-white/60 group-hover:text-white transition-colors">{link.label}</span>
+                                                </div>
+                                                <ExternalLink className="w-4 h-4 text-white/20 group-hover:text-brand-gold transition-colors" />
+                                            </a>
+                                        ))}
+                                    </div>
+
+                                    {/* LISTA DE AVISOS EXTRAÍDOS */}
+                                    <div className="space-y-4">
+                                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 ml-4">Despachos & Avisos Recentes</h4>
+
+                                        {isUpdatingNav ? (
+                                            <div className="p-20 text-center bg-white/5 rounded-[40px] border border-dashed border-white/10">
+                                                <Radio className="w-12 h-12 text-brand-gold animate-bounce mx-auto mb-4" />
+                                                <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/40">Intercetando comunicações oficiais...</p>
+                                            </div>
+                                        ) : !navStatus?.notices?.length ? (
+                                            <div className="p-20 text-center bg-white/5 rounded-[40px] border border-dashed border-white/10">
+                                                <CheckCircle className="w-12 h-12 text-green-500/50 mx-auto mb-4" />
+                                                <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/40">Nenhum perigo iminente reportado pela IA</p>
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                {navStatus.notices.map((notice) => (
+                                                    <div key={notice.id} className={`bg-white/5 backdrop-blur-md p-6 rounded-[32px] border transition-all hover:bg-white/10 ${notice.severity === 'CRITICAL' ? 'border-red-500/30' : notice.severity === 'ALERT' ? 'border-brand-gold/30' : 'border-white/10'
+                                                        }`}>
+                                                        <div className="flex items-start justify-between mb-4">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${notice.source === 'APDL' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-brand-gold/10 text-brand-gold border border-brand-gold/20'
+                                                                    }`}>
+                                                                    {notice.source}
                                                                 </div>
-                                                                {task.notes && (
-                                                                    <div className="bg-brand-bg/50 p-2 rounded-lg border border-brand-border/50">
-                                                                        <p className="text-[10px] text-brand-muted italic leading-tight">"{task.notes}"</p>
+                                                                <span className="text-[10px] font-bold text-white/40 uppercase">{notice.type}</span>
+                                                            </div>
+                                                            <span className="text-[9px] font-black text-white/30">{new Date(notice.timestamp).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <h5 className="text-lg font-black text-white uppercase tracking-tighter mb-2">{notice.title}</h5>
+                                                        <p className="text-sm text-white/60 leading-relaxed mb-4">{notice.description}</p>
+                                                        {notice.link && (
+                                                            <a href={notice.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[10px] font-black text-brand-gold uppercase tracking-widest hover:underline">
+                                                                Ver Documento Original <ExternalLink className="w-3 h-3" />
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* SEÇÃO DE DIRETÓRIO & DADOS TÉCNICOS */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                                        <div className="bg-white/5 backdrop-blur-md p-8 rounded-[40px] border border-white/10 shadow-glass">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Directório de Autoridades</h4>
+                                                <Users className="w-4 h-4 text-brand-gold" />
+                                            </div>
+                                            <div className="space-y-3">
+                                                {[
+                                                    { name: 'Capitania Douro', phone: '+351 222 070 970' },
+                                                    { name: 'Polícia Marítima', phone: '+351 916 352 918' },
+                                                    { name: 'Sede APDL (Régua)', phone: '+351 254 320 030' }
+                                                ].map((auth, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl">
+                                                        <span className="text-xs font-bold text-white/80">{auth.name}</span>
+                                                        <a href={`tel:${auth.phone.replace(/\s/g, '')}`} className="text-[10px] font-black text-brand-gold uppercase tracking-widest hover:underline">{auth.phone}</a>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={() => setIsAuthoritiesModalOpen(true)}
+                                                className="w-full mt-6 py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+                                            >
+                                                Ver Todos os Contactos
+                                            </button>
+                                        </div>
+
+                                        <div className="bg-white/5 backdrop-blur-md p-8 rounded-[40px] border border-white/10 shadow-glass">
+                                            <div className="flex items-center justify-between mb-6">
+                                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Roteiro Técnico (Eclusas)</h4>
+                                                <Anchor className="w-4 h-4 text-brand-gold" />
+                                            </div>
+                                            <div className="space-y-3">
+                                                {[
+                                                    { name: 'Crestuma-Lever', km: '21.6', height: '13.9m' },
+                                                    { name: 'Carrapatelo', km: '71.4', height: '35.0m' },
+                                                    { name: 'Bagaúste', km: '125.2', height: '28.5m' },
+                                                    { name: 'Valeira', km: '173.2', height: '33.0m' }
+                                                ].map((lock, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-bold text-white/80">{lock.name}</span>
+                                                            <span className="text-[9px] font-black text-white/20 uppercase">Km {lock.km}</span>
+                                                        </div>
+                                                        <span className="text-[10px] font-black text-brand-gold uppercase tracking-widest">Queda: {lock.height}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* LOGÍSTICA & OPS TAB */}
+                            {activeTab === 'LOGISTICA' && (
+                                <div className="space-y-6">
+
+                                    {/* CONTROLOS DE CRIAÇÃO */}
+                                    <div className="bg-white/5 backdrop-blur-md p-8 rounded-[40px] border border-white/10 shadow-sm">
+                                        <div className="flex flex-col md:flex-row gap-6 items-end mb-4">
+                                            <div className="flex-1 space-y-2 w-full">
+                                                <label htmlFor="logisticsDate" className="text-[9px] font-bold text-brand-gold uppercase tracking-widest ml-1">Data da Missão</label>
+                                                <input
+                                                    id="logisticsDate"
+                                                    type="date"
+                                                    title="Data da Missão"
+                                                    value={logisticsDate}
+                                                    onChange={(e) => setLogisticsDate(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-brand-gold custom-date-input"
+                                                />
+                                            </div>
+                                            <div className="flex-1 space-y-2 w-full">
+                                                <label htmlFor="logisticsBoat" className="text-[9px] font-bold text-brand-gold uppercase tracking-widest ml-1">Embarcação</label>
+                                                <select
+                                                    id="logisticsBoat"
+                                                    title="Selecionar Embarcação"
+                                                    value={newLogisticsBoatId}
+                                                    onChange={(e) => setNewLogisticsBoatId(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-brand-gold"
+                                                >
+                                                    <option value="">Selecionar Barco...</option>
+                                                    {fleet.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="flex-1 space-y-2 w-full">
+                                                <label htmlFor="logisticsType" className="text-[9px] font-bold text-brand-gold uppercase tracking-widest ml-1">Tipo de Tarefa</label>
+                                                <select
+                                                    id="logisticsType"
+                                                    title="Selecionar Tipo de Tarefa"
+                                                    value={newLogisticsType}
+                                                    onChange={(e) => setNewLogisticsType(e.target.value as LogisticsTaskType)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-brand-gold"
+                                                >
+                                                    <option value="PREP_BARCO">Preparação Geral (Manhã)</option>
+                                                    <option value="DEGUSTACAO">Prep. Degustação</option>
+                                                    <option value="ABASTECER_COMB">Abastecer Combustível</option>
+                                                    <option value="ABASTECER_AGUA">Abastecer Água</option>
+                                                    <option value="FECHO_COMPLETO">Fecho de Dia (Fotos Obrigatórias)</option>
+                                                </select>
+                                            </div>
+                                            <div className="flex-1 space-y-2 w-full">
+                                                <label htmlFor="logisticsStaff" className="text-[9px] font-bold text-brand-gold uppercase tracking-widest ml-1">Staff Responsável</label>
+                                                <select
+                                                    id="logisticsStaff"
+                                                    title="Selecionar Staff Responsável"
+                                                    value={newLogisticsStaffId}
+                                                    onChange={(e) => setNewLogisticsStaffId(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-brand-gold"
+                                                >
+                                                    <option value="">Selecionar Staff...</option>
+                                                    {team.filter(t => t.active).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-col md:flex-row gap-6 items-end">
+                                            <div className="flex-[3] space-y-2 w-full">
+                                                <label htmlFor="logisticsNotes" className="text-[9px] font-bold text-brand-muted uppercase tracking-widest ml-1">Instruções Específicas</label>
+                                                <input
+                                                    id="logisticsNotes"
+                                                    title="Instruções Específicas"
+                                                    type="text"
+                                                    value={newLogisticsNotes}
+                                                    onChange={(e) => setNewLogisticsNotes(e.target.value)}
+                                                    placeholder="Ex: Levar 2 jarricas cheias; Verificar nível óleo motor direito..."
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm font-medium text-white outline-none focus:border-brand-gold"
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={addLogisticsTask}
+                                                className="flex-1 px-6 py-3.5 bg-brand-gold text-[#0A101C] rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg hover:scale-105 active:scale-95 transition-all mb-0.5"
+                                                aria-label="Adicionar Tarefa Logística"
+                                                title="Adicionar Tarefa Logística"
+                                            >
+                                                Adicionar Tarefa
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* LISTAGEM DE TAREFAS */}
+                                    <div className="bg-white/5 backdrop-blur-md rounded-[40px] shadow-glass border border-white/10 overflow-hidden">
+                                        <div className="p-8 border-b border-white/10 text-center">
+                                            <h3 className="text-xl font-bold text-white flex flex-col items-center justify-center gap-2">
+                                                Missões Logísticas
+                                                <span className="text-sm font-medium text-brand-gold bg-black/40 border border-white/10 px-4 py-1 rounded-full">{logisticsDate}</span>
+                                            </h3>
+                                        </div>
+
+                                        {filteredLogistics.length === 0 ? (
+                                            <div className="p-12 text-center text-white/40">
+                                                <p className="text-xs font-bold uppercase tracking-widest">Nenhuma tarefa atribuída para este dia.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="divide-y divide-white/10">
+                                                {fleet.map(boat => {
+                                                    const boatTasks = filteredLogistics.filter(t => t.boatId === boat.id);
+                                                    if (boatTasks.length === 0) return null;
+
+                                                    return (
+                                                        <div key={boat.id} className="p-6 hover:bg-white/5 transition-colors">
+                                                            <div className="flex items-center gap-3 mb-4">
+                                                                <Ship className="w-4 h-4 text-brand-gold" />
+                                                                <h4 className="font-black text-white uppercase">{boat.name}</h4>
+                                                            </div>
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                                {boatTasks.map(task => {
+                                                                    const assignee = team.find(t => t.id === task.staffId);
+                                                                    const Icon = getTaskIcon(task.type);
+
+                                                                    return (
+                                                                        <div key={task.id} className={`p-4 rounded-2xl border flex flex-col gap-2 ${task.status === 'DONE' ? 'bg-green-500/20 border-green-500/50' : 'bg-black/40 border-white/10'}`}>
+                                                                            <div className="flex items-center justify-between">
+                                                                                <div className="flex items-center gap-3">
+                                                                                    <div className={`p-2 rounded-xl ${task.status === 'DONE' ? 'bg-green-500/30 text-green-400' : 'bg-white/5 text-brand-gold'}`}>
+                                                                                        <Icon className="w-4 h-4" />
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <p className="text-xs font-bold text-white">{getTaskLabel(task.type)}</p>
+                                                                                        <p className="text-[10px] font-medium text-white/50 uppercase tracking-wider">{assignee?.name || 'Desconhecido'}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    {task.status === 'DONE' && task.type === 'FECHO_COMPLETO' && (
+                                                                                        <button
+                                                                                            onClick={() => setViewingLogisticsEntry(task)}
+                                                                                            className="p-2 bg-black/40 rounded-lg border border-green-500/50 text-green-400 hover:scale-110 transition-transform"
+                                                                                            title="Ver Provas Logísticas"
+                                                                                            aria-label="Ver Provas Logísticas"
+                                                                                        >
+                                                                                            <Camera className="w-3 h-3" />
+                                                                                        </button>
+                                                                                    )}
+                                                                                    <button
+                                                                                        onClick={() => deleteLogisticsTask(task.id)}
+                                                                                        className="p-2 hover:bg-red-50 text-brand-muted hover:text-red-500 rounded-lg transition-colors"
+                                                                                        title="Eliminar Tarefa Logística"
+                                                                                        aria-label="Eliminar Tarefa Logística"
+                                                                                    >
+                                                                                        <Trash2 className="w-3 h-3" />
+                                                                                    </button>
+                                                                                </div>
+                                                                            </div>
+                                                                            {task.notes && (
+                                                                                <div className="bg-brand-bg/50 p-2 rounded-lg border border-brand-border/50">
+                                                                                    <p className="text-[10px] text-brand-muted italic leading-tight">"{task.notes}"</p>
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* AGENDA TAB - MANTIDA */}
+                            {activeTab === 'AGENDA' && (
+                                <div className="space-y-4">
+                                    {tasks.length === 0 ? (
+                                        <div className="bg-white/5 backdrop-blur-md p-20 rounded-[40px] text-center border border-dashed border-white/20 opacity-50 shadow-glass">
+                                            <Calendar className="w-16 h-16 mx-auto mb-4 text-brand-gold" />
+                                            <p className="text-sm font-bold uppercase tracking-widest text-white/50">Nenhum serviço agendado para hoje</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {tasks.sort((a, b) => a.time.localeCompare(b.time)).map(task => (
+                                                <div key={task.id} className="bg-white/5 backdrop-blur-md p-8 rounded-[40px] border border-white/10 flex flex-col md:flex-row justify-between items-center gap-6 group hover:border-brand-gold/30 hover:bg-white/10 transition-all shadow-glass">
+                                                    <div className="flex-1 flex flex-col md:flex-row items-center gap-8">
+                                                        <div className="w-16 h-16 bg-black/40 rounded-3xl flex flex-col items-center justify-center text-brand-gold border border-white/10 shadow-inner shrink-0" aria-label={`Hora da missão: ${task.time}`} title={`Hora da missão: ${task.time}`}>
+                                                            <span className="text-xs font-black">{task.time}</span>
+                                                            <Clock className="w-3 h-3 mt-1 opacity-50" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                                                <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${task.isPrivate ? 'bg-brand-gold/10 text-brand-gold border border-brand-gold/20' : 'bg-white/5 text-white/50 border border-white/10'}`}>
+                                                                    {task.type || (task.isPrivate ? 'Privado' : 'Partilhado')}
+                                                                </span>
+                                                                <span className="text-[10px] font-black text-brand-gold uppercase bg-brand-gold/5 border border-brand-gold/20 px-3 py-1.5 rounded-full flex items-center gap-2">
+                                                                    <Ship className="w-3 h-3" /> {task.boat}
+                                                                </span>
+                                                            </div>
+                                                            <h4 className="text-2xl font-black text-white tracking-tighter uppercase truncate">{task.clientName}</h4>
+                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                                                                <div className="space-y-1">
+                                                                    <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Skipper</p>
+                                                                    <p className="text-[11px] font-bold text-white flex items-center gap-1.5 uppercase">
+                                                                        <Anchor className="w-3 h-3 text-brand-gold" /> {task.crew?.condutor || 'Pendente'}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="space-y-1">
+                                                                    <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Ajudante</p>
+                                                                    <p className="text-[11px] font-bold text-white flex items-center gap-1.5 uppercase">
+                                                                        <Navigation2 className="w-3 h-3 text-brand-gold" /> {task.crew?.assistente || 'Leandro'}
+                                                                    </p>
+                                                                </div>
+                                                                {task.crew?.guia && (
+                                                                    <div className="space-y-1">
+                                                                        <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Guia</p>
+                                                                        <p className="text-[11px] font-bold text-white flex items-center gap-1.5 uppercase">
+                                                                            <Zap className="w-3 h-3 text-brand-gold" /> {task.crew.guia}
+                                                                        </p>
                                                                     </div>
                                                                 )}
+                                                                <div className="space-y-1">
+                                                                    <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Lotação</p>
+                                                                    <p className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                                                                        <Users className="w-3 h-3 text-white/50" /> {task.pax} PAX
+                                                                    </p>
+                                                                </div>
                                                             </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
-
-                {/* AGENDA TAB - MANTIDA */}
-                {activeTab === 'AGENDA' && (
-                    <div className="space-y-4">
-                        {tasks.length === 0 ? (
-                            <div className="bg-white p-20 rounded-[40px] text-center border-2 border-dashed border-brand-border opacity-50">
-                                <Calendar className="w-16 h-16 mx-auto mb-4 text-brand-primary" />
-                                <p className="text-sm font-bold uppercase tracking-widest">Nenhum serviço agendado para hoje</p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 gap-4">
-                                {tasks.sort((a, b) => a.time.localeCompare(b.time)).map(task => (
-                                    <div key={task.id} className="bg-white p-8 rounded-[40px] border border-brand-border flex flex-col md:flex-row justify-between items-center gap-6 group hover:border-brand-primary transition-all shadow-sm">
-                                        <div className="flex-1 flex flex-col md:flex-row items-center gap-8">
-                                            <div className="w-16 h-16 bg-brand-bg rounded-3xl flex flex-col items-center justify-center text-brand-primary border border-brand-border shadow-inner shrink-0" aria-label={`Hora da missão: ${task.time}`} title={`Hora da missão: ${task.time}`}>
-                                                <span className="text-xs font-black">{task.time}</span>
-                                                <Clock className="w-3 h-3 mt-1 opacity-30" />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                                    <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${task.isPrivate ? 'bg-brand-gold text-brand-primary' : 'bg-brand-bg text-brand-muted'}`}>
-                                                        {task.type || (task.isPrivate ? 'Privado' : 'Partilhado')}
-                                                    </span>
-                                                    <span className="text-[10px] font-black text-brand-primary uppercase bg-brand-primary/5 px-3 py-1.5 rounded-full flex items-center gap-2">
-                                                        <Ship className="w-3 h-3" /> {task.boat}
-                                                    </span>
-                                                </div>
-                                                <h4 className="text-2xl font-black text-brand-dark tracking-tighter uppercase truncate">{task.clientName}</h4>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                                                    <div className="space-y-1">
-                                                        <p className="text-[8px] font-black text-brand-muted uppercase tracking-widest">Skipper</p>
-                                                        <p className="text-[11px] font-bold text-brand-dark flex items-center gap-1.5 uppercase">
-                                                            <Anchor className="w-3 h-3 text-brand-gold" /> {task.crew?.condutor || 'Pendente'}
-                                                        </p>
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <p className="text-[8px] font-black text-brand-muted uppercase tracking-widest">Ajudante</p>
-                                                        <p className="text-[11px] font-bold text-brand-dark flex items-center gap-1.5 uppercase">
-                                                            <Navigation2 className="w-3 h-3 text-brand-primary" /> {task.crew?.assistente || 'Leandro'}
-                                                        </p>
-                                                    </div>
-                                                    {task.crew?.guia && (
-                                                        <div className="space-y-1">
-                                                            <p className="text-[8px] font-black text-brand-muted uppercase tracking-widest">Guia</p>
-                                                            <p className="text-[11px] font-bold text-brand-dark flex items-center gap-1.5 uppercase">
-                                                                <Zap className="w-3 h-3 text-brand-gold" /> {task.crew.guia}
-                                                            </p>
                                                         </div>
-                                                    )}
-                                                    <div className="space-y-1">
-                                                        <p className="text-[8px] font-black text-brand-muted uppercase tracking-widest">Lotação</p>
-                                                        <p className="text-[11px] font-bold text-brand-dark flex items-center gap-1.5">
-                                                            <Users className="w-3 h-3 text-brand-muted" /> {task.pax} PAX
-                                                        </p>
+                                                    </div>
+                                                    <div className="flex items-center gap-4 shrink-0">
+                                                        <button onClick={() => { setEditingTask(task); setNewTask(task); setIsAddingTask(true); }} className="p-4 bg-white/5 border border-white/10 text-white/50 hover:text-brand-gold hover:border-brand-gold/30 rounded-2xl transition-all shadow-glass" aria-label="Editar Missão" title="Editar Missão"><Edit2 className="w-5 h-5" /></button>
+                                                        <button onClick={() => onDeleteTask(task.id)} className="p-4 bg-red-500/10 border border-red-500/20 text-red-500 hover:text-red-400 hover:bg-red-500/20 rounded-2xl transition-all shadow-glass" aria-label="Eliminar Missão" title="Eliminar Missão"><Trash2 className="w-5 h-5" /></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* ... OUTRAS SECÇÕES (EQUIPA, FROTA, CONFIG) MANTIDAS ... */}
+                            {activeTab === 'EQUIPA' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <button
+                                        onClick={() => {
+                                            setEditingStaff(null);
+                                            setNewStaff({ name: '', role: 'SKIPPER', active: true, email: '', phone: '' });
+                                            setIsAddingResource('STAFF');
+                                        }}
+                                        className="bg-white/5 backdrop-blur-md p-10 rounded-[40px] border border-dashed border-white/20 flex flex-col items-center justify-center text-center group hover:border-brand-gold/50 hover:bg-white/10 transition-all shadow-glass"
+                                        aria-label="Novo Elemento da Equipa"
+                                        title="Novo Elemento da Equipa"
+                                    >
+                                        <div className="w-20 h-20 bg-black/40 rounded-[28px] flex items-center justify-center mb-6 group-hover:bg-brand-gold group-hover:text-[#0A101C] transition-all text-white/50">
+                                            <UserPlus className="w-10 h-10" />
+                                        </div>
+                                        <p className="text-sm font-black uppercase tracking-[0.2em] text-white/50 group-hover:text-brand-gold">Novo Staff</p>
+                                    </button>
+                                    {team.map(member => (
+                                        <div key={member.id} className="bg-white/5 backdrop-blur-md p-8 rounded-[40px] border border-white/10 flex flex-col shadow-glass relative overflow-hidden group hover:border-white/20 transition-all">
+                                            <div className="flex items-center gap-5 mb-6">
+                                                <div className="w-16 h-16 bg-brand-gold/10 text-brand-gold border border-brand-gold/20 rounded-[24px] flex items-center justify-center font-black text-2xl shadow-inner uppercase">{member.name.charAt(0)}</div>
+                                                <div className="min-w-0">
+                                                    <h4 className="font-black text-white uppercase text-lg tracking-tighter truncate">{member.name}</h4>
+                                                    <span className="px-3 py-1 bg-white/10 text-white/70 rounded-full text-[9px] font-black uppercase tracking-widest">{member.role}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-2 mb-6">
+                                                {member.email && (
+                                                    <div className="flex items-center gap-2 text-xs font-medium text-white/50">
+                                                        <Mail className="w-3 h-3" /> <span className="truncate">{member.email}</span>
+                                                    </div>
+                                                )}
+                                                {member.phone && (
+                                                    <div className="flex items-center gap-2 text-xs font-medium text-white/50">
+                                                        <Phone className="w-3 h-3" /> <span className="truncate">{member.phone}</span>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="mt-auto pt-6 border-t border-white/10 flex flex-col gap-4">
+                                                <div className="flex justify-between items-center w-full">
+                                                    <span className={`text-[10px] font-black uppercase tracking-widest ${member.active ? 'text-green-400' : 'text-red-400'}`}>{member.active ? 'Ativo' : 'Inativo'}</span>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingStaff(member);
+                                                                setNewStaff(member);
+                                                                setIsAddingResource('STAFF');
+                                                            }}
+                                                            className="p-3 text-white/40 hover:text-brand-gold bg-black/40 hover:bg-white/10 border border-transparent hover:border-brand-gold/30 rounded-xl transition-all"
+                                                            aria-label="Editar Membro"
+                                                            title="Editar Membro da Equipa"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => onUpdateTeam(team.filter(t => t.id !== member.id))}
+                                                            className="p-3 text-white/40 hover:text-red-400 bg-black/40 hover:bg-red-500/10 border border-transparent hover:border-red-500/30 rounded-xl transition-all"
+                                                            aria-label="Eliminar Membro"
+                                                            title="Eliminar Membro da Equipa"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* QUICK ACTIONS - WHATSAPP & CALL */}
+                                                {member.phone && (
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <a
+                                                            href={`tel:${member.phone.replace(/\s/g, '')}`}
+                                                            className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-white/10 hover:border-white/30 transition-all font-sans"
+                                                        >
+                                                            <Phone className="w-4 h-4" /> Ligar
+                                                        </a>
+                                                        <a
+                                                            href={`https://wa.me/${member.phone.replace(/\s/g, '').replace('+', '')}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center justify-center gap-2 py-3 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#25D366] rounded-xl text-[10px] font-black uppercase tracking-widest border border-[#25D366]/20 transition-all font-sans"
+                                                        >
+                                                            <MessageCircle className="w-4 h-4" /> WhatsApp
+                                                        </a>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* ... OUTRAS SECÇÕES (FROTA, CONFIG, MODAIS) ... MANTIDAS IGUAIS ... */}
+                            {activeTab === 'FROTA' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    <button
+                                        onClick={() => {
+                                            setEditingBoat(null);
+                                            setNewBoat({ name: '', cap: 10, photoUrl: '', info: '', videoUrl: '', tiktokUrl: '' });
+                                            setIsAddingResource('BOAT');
+                                        }}
+                                        className="bg-white/5 backdrop-blur-md min-h-[300px] rounded-[48px] border border-dashed border-white/20 flex flex-col items-center justify-center text-center group hover:border-brand-gold/50 hover:bg-white/10 transition-all shadow-glass"
+                                        aria-label="Adicionar Embarcação"
+                                        title="Adicionar Embarcação"
+                                    >
+                                        <div className="w-20 h-20 bg-black/40 rounded-[28px] flex items-center justify-center mb-6 group-hover:bg-brand-gold group-hover:text-[#0A101C] transition-all shadow-lg text-white/50">
+                                            <Anchor className="w-10 h-10" />
+                                        </div>
+                                        <p className="text-sm font-black uppercase tracking-[0.2em] text-white/50 group-hover:text-brand-gold">Adicionar Embarcação</p>
+                                    </button>
+                                    {fleet.map(boat => (
+                                        <div key={boat.id} className="bg-white/5 backdrop-blur-md rounded-[48px] border border-white/10 shadow-glass flex flex-col overflow-hidden group hover:border-white/20 hover:shadow-xl transition-all">
+                                            <div className="h-48 relative overflow-hidden bg-black/40 border-b border-white/10">
+                                                {boat.photoUrl ? (
+                                                    <img src={boat.photoUrl} alt={boat.name} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-white/10">
+                                                        <Ship className="w-20 h-20" />
+                                                    </div>
+                                                )}
+                                                <div className="absolute top-4 right-4 flex gap-2">
+                                                    <div className="px-4 py-2 bg-[#0A101C]/80 backdrop-blur-md border border-brand-gold/20 text-brand-gold rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                                                        {boat.cap} PAX
                                                     </div>
                                                 </div>
                                             </div>
+                                            <div className="p-8 flex-1 flex flex-col">
+                                                <h4 className="font-black text-white uppercase text-2xl tracking-tighter mb-3">{boat.name}</h4>
+                                                <p className="text-xs text-white/50 font-medium leading-relaxed line-clamp-2">{boat.info || "Sem especificações."}</p>
+                                                <div className="mt-8 pt-6 border-t border-white/10 flex justify-between gap-4">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingBoat(boat);
+                                                            setNewBoat(boat);
+                                                            setIsAddingResource('BOAT');
+                                                        }}
+                                                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-white/5 text-white/40 hover:text-brand-gold hover:bg-brand-gold/10 hover:border-brand-gold/20 border border-transparent rounded-2xl transition-all font-bold text-[10px] uppercase tracking-widest"
+                                                    >
+                                                        <Edit2 className="w-4 h-4" /> Editar
+                                                    </button>
+                                                    <button
+                                                        onClick={() => onUpdateFleet(fleet.filter(b => b.id !== boat.id))}
+                                                        className="p-3 text-white/40 hover:text-red-400 bg-white/5 border border-transparent hover:bg-red-500/10 hover:border-red-500/30 rounded-2xl transition-all"
+                                                        aria-label="Eliminar Embarcação"
+                                                        title="Eliminar Embarcação"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-4 shrink-0">
-                                            <button onClick={() => { setEditingTask(task); setNewTask(task); setIsAddingTask(true); }} className="p-4 bg-brand-bg text-brand-muted hover:text-brand-primary rounded-2xl transition-all shadow-sm" aria-label="Editar Missão" title="Editar Missão"><Edit2 className="w-5 h-5" /></button>
-                                            <button onClick={() => onDeleteTask(task.id)} className="p-4 bg-red-50 text-red-400 hover:text-red-600 rounded-2xl transition-all shadow-sm" aria-label="Eliminar Missão" title="Eliminar Missão"><Trash2 className="w-5 h-5" /></button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+                                    ))}
+                                </div>
+                            )}
 
-                {/* ... OUTRAS SECÇÕES (EQUIPA, FROTA, CONFIG) MANTIDAS ... */}
-                {activeTab === 'EQUIPA' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <button
-                            onClick={() => {
-                                setEditingStaff(null);
-                                setNewStaff({ name: '', role: 'SKIPPER', active: true, email: '', phone: '' });
-                                setIsAddingResource('STAFF');
-                            }}
-                            className="bg-white p-10 rounded-[40px] border-4 border-dashed border-brand-border flex flex-col items-center justify-center text-center group hover:border-brand-primary transition-all shadow-sm"
-                            aria-label="Novo Elemento da Equipa"
-                            title="Novo Elemento da Equipa"
-                        >
-                            <div className="w-20 h-20 bg-brand-bg rounded-[28px] flex items-center justify-center mb-6 group-hover:bg-brand-primary group-hover:text-white transition-all">
-                                <UserPlus className="w-10 h-10" />
-                            </div>
-                            <p className="text-sm font-black uppercase tracking-[0.2em] text-brand-muted group-hover:text-brand-primary">Novo Staff</p>
-                        </button>
-                        {team.map(member => (
-                            <div key={member.id} className="bg-white p-8 rounded-[40px] border border-brand-border flex flex-col shadow-sm relative overflow-hidden">
-                                <div className="flex items-center gap-5 mb-6">
-                                    <div className="w-16 h-16 bg-brand-primary/10 text-brand-primary rounded-[24px] flex items-center justify-center font-black text-2xl shadow-inner uppercase">{member.name.charAt(0)}</div>
-                                    <div className="min-w-0">
-                                        <h4 className="font-black text-brand-dark uppercase text-lg tracking-tighter truncate">{member.name}</h4>
-                                        <span className="px-3 py-1 bg-brand-gold/20 text-brand-primary rounded-full text-[9px] font-black uppercase tracking-widest">{member.role}</span>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 mb-6">
-                                    {member.email && (
-                                        <div className="flex items-center gap-2 text-xs font-medium text-brand-muted">
-                                            <Mail className="w-3 h-3" /> <span className="truncate">{member.email}</span>
-                                        </div>
-                                    )}
-                                    {member.phone && (
-                                        <div className="flex items-center gap-2 text-xs font-medium text-brand-muted">
-                                            <Phone className="w-3 h-3" /> <span className="truncate">{member.phone}</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="mt-auto pt-6 border-t border-brand-border flex justify-between items-center gap-2">
-                                    <span className={`text-[10px] font-black uppercase tracking-widest ${member.active ? 'text-green-500' : 'text-red-500'}`}>{member.active ? 'Ativo' : 'Inativo'}</span>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                setEditingStaff(member);
-                                                setNewStaff(member);
-                                                setIsAddingResource('STAFF');
-                                            }}
-                                            className="p-3 text-brand-muted hover:text-brand-primary bg-brand-bg hover:bg-white border border-transparent hover:border-brand-border rounded-xl transition-all"
-                                            aria-label="Editar Membro"
-                                            title="Editar Membro da Equipa"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => onUpdateTeam(team.filter(t => t.id !== member.id))}
-                                            className="p-3 text-brand-muted hover:text-red-500 bg-brand-bg hover:bg-white border border-transparent hover:border-brand-border rounded-xl transition-all"
-                                            aria-label="Eliminar Membro"
-                                            title="Eliminar Membro da Equipa"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {/* ... OUTRAS SECÇÕES (FROTA, CONFIG, MODAIS) ... MANTIDAS IGUAIS ... */}
-                {activeTab === 'FROTA' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                        <button
-                            onClick={() => {
-                                setEditingBoat(null);
-                                setNewBoat({ name: '', cap: 10, photoUrl: '', info: '', videoUrl: '', tiktokUrl: '' });
-                                setIsAddingResource('BOAT');
-                            }}
-                            className="bg-white min-h-[300px] rounded-[48px] border-4 border-dashed border-brand-border flex flex-col items-center justify-center text-center group hover:border-brand-primary transition-all shadow-sm"
-                            aria-label="Adicionar Embarcação"
-                            title="Adicionar Embarcação"
-                        >
-                            <div className="w-20 h-20 bg-brand-bg rounded-[28px] flex items-center justify-center mb-6 group-hover:bg-brand-primary group-hover:text-white transition-all shadow-lg">
-                                <Anchor className="w-10 h-10" />
-                            </div>
-                            <p className="text-sm font-black uppercase tracking-[0.2em] text-brand-muted group-hover:text-brand-primary">Adicionar Embarcação</p>
-                        </button>
-                        {fleet.map(boat => (
-                            <div key={boat.id} className="bg-white rounded-[48px] border border-brand-border shadow-md flex flex-col overflow-hidden group hover:shadow-xl transition-all">
-                                <div className="h-48 relative overflow-hidden bg-brand-bg">
-                                    {boat.photoUrl ? (
-                                        <img src={boat.photoUrl} alt={boat.name} className="w-full h-full object-cover transition-transform group-hover:scale-110 duration-700" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-brand-muted/20">
-                                            <Ship className="w-20 h-20" />
-                                        </div>
-                                    )}
-                                    <div className="absolute top-4 right-4 flex gap-2">
-                                        <div className="px-4 py-2 bg-brand-primary text-brand-gold rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
-                                            {boat.cap} PAX
+                            {/* ... CONFIG TAB MANTIDA ... */}
+                            {activeTab === 'CONFIG' && (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <div className="lg:col-span-2 bg-[#0A101C]/80 backdrop-blur-xl border border-white/10 p-12 rounded-[56px] text-white shadow-2xl relative overflow-hidden">
+                                        <div className="absolute inset-0 z-[5] opacity-[0.06] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+                                        <ShieldCheck className="absolute -right-8 -top-8 w-64 h-64 opacity-5 text-brand-gold" />
+                                        <div className="relative z-10 max-w-4xl">
+                                            <h3 className="text-3xl font-black uppercase tracking-tighter mb-10 flex items-center gap-6">
+                                                <Lock className="w-8 h-8 text-brand-gold" /> Segurança Administrativa
+                                            </h3>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div className="space-y-3">
+                                                    <label htmlFor="adminUser" className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">Utilizador Mestre</label>
+                                                    <input id="adminUser" type="text" title="Utilizador Mestre" placeholder="Utilizador" value={adminUser} onChange={(e) => setAdminUser(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-[24px] px-8 py-5 text-lg font-bold text-white outline-none focus:border-brand-gold focus:bg-white/5 transition-all" />
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label htmlFor="adminPass" className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">Chave de Acesso</label>
+                                                    <input id="adminPass" type="password" title="Chave de Acesso" placeholder="Senha" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-[24px] px-8 py-5 text-lg font-bold text-white outline-none focus:border-brand-gold focus:bg-white/5 transition-all" />
+                                                </div>
+                                            </div>
+                                            <button onClick={handleUpdateCreds} disabled={isSavingCreds} className="mt-12 px-12 py-5 bg-brand-gold text-[#0A101C] rounded-[28px] font-black text-xs uppercase tracking-[0.3em] shadow-xl shadow-brand-gold/20 hover:scale-[1.02] hover:bg-yellow-400 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3">
+                                                {isSavingCreds ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                                                {isSavingCreds ? 'A Criptografar...' : 'Atualizar Protocolo de Segurança'}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="p-8 flex-1 flex flex-col">
-                                    <h4 className="font-black text-brand-dark uppercase text-2xl tracking-tighter mb-3">{boat.name}</h4>
-                                    <p className="text-xs text-brand-muted font-medium leading-relaxed line-clamp-2">{boat.info || "Sem especificações."}</p>
-                                    <div className="mt-8 pt-6 border-t border-brand-border flex justify-between gap-4">
-                                        <button
-                                            onClick={() => {
-                                                setEditingBoat(boat);
-                                                setNewBoat(boat);
-                                                setIsAddingResource('BOAT');
-                                            }}
-                                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-bg text-brand-muted hover:text-brand-primary hover:bg-brand-primary/5 rounded-2xl transition-all font-bold text-[10px] uppercase tracking-widest"
-                                        >
-                                            <Edit2 className="w-4 h-4" /> Editar
-                                        </button>
-                                        <button
-                                            onClick={() => onUpdateFleet(fleet.filter(b => b.id !== boat.id))}
-                                            className="p-3 text-brand-muted hover:text-red-500 bg-brand-bg rounded-2xl transition-all"
-                                            aria-label="Eliminar Embarcação"
-                                            title="Eliminar Embarcação"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                            )}
 
-                {/* ... CONFIG TAB MANTIDA ... */}
-                {activeTab === 'CONFIG' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <div className="lg:col-span-2 bg-brand-primary p-12 rounded-[56px] text-white shadow-2xl relative overflow-hidden">
-                            <ShieldCheck className="absolute -right-8 -top-8 w-64 h-64 opacity-5 text-white" />
-                            <div className="relative z-10 max-w-4xl">
-                                <h3 className="text-3xl font-black uppercase tracking-tighter mb-10 flex items-center gap-6">
-                                    <Lock className="w-8 h-8 text-brand-gold" /> Segurança Administrativa
-                                </h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-3">
-                                        <label htmlFor="adminUser" className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">Utilizador Mestre</label>
-                                        <input id="adminUser" type="text" title="Utilizador Mestre" placeholder="Utilizador" value={adminUser} onChange={(e) => setAdminUser(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-[24px] px-8 py-5 text-lg font-bold text-white outline-none focus:border-brand-gold transition-all" />
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label htmlFor="adminPass" className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">Chave de Acesso</label>
-                                        <input id="adminPass" type="password" title="Chave de Acesso" placeholder="Senha" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} className="w-full bg-white/10 border border-white/20 rounded-[24px] px-8 py-5 text-lg font-bold text-white outline-none focus:border-brand-gold transition-all" />
+                            {/* MODAL PARA VER FOTOS LOGISTICAS (Granular) */}
+                            {viewingLogisticsEntry && (
+                                <div className="fixed inset-0 z-[600] flex items-center justify-center p-6">
+                                    <div className="absolute inset-0 bg-brand-dark/95 backdrop-blur-xl" onClick={() => setViewingLogisticsEntry(null)}></div>
+                                    <div className="relative w-full max-w-2xl bg-white rounded-[48px] p-10 shadow-2xl animate-slideUp overflow-hidden">
+                                        <div className="flex justify-between items-center mb-8">
+                                            <div>
+                                                <h3 className="text-2xl font-black text-brand-dark uppercase tracking-tighter">
+                                                    Auditoria: {fleet.find(b => b.id === viewingLogisticsEntry.boatId)?.name}
+                                                </h3>
+                                                <p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest mt-1">
+                                                    {viewingLogisticsEntry.date} • {team.find(t => t.id === viewingLogisticsEntry.staffId)?.name}
+                                                </p>
+                                            </div>
+                                            <button aria-label="Fechar Modal de Auditoria" title="Fechar Modal de Auditoria" onClick={() => setViewingLogisticsEntry(null)} className="p-3 hover:bg-brand-bg rounded-2xl transition-all"><X className="w-6 h-6" /></button>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            {/* Foto Combustível */}
+                                            <div className="space-y-4">
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-brand-primary flex items-center gap-2">
+                                                    <Zap className="w-4 h-4" /> Combustível
+                                                </h4>
+                                                <div className="aspect-square bg-brand-bg rounded-2xl border-2 border-brand-border overflow-hidden flex items-center justify-center relative group">
+                                                    {viewingLogisticsEntry.fuelPhoto ? (
+                                                        <img src={viewingLogisticsEntry.fuelPhoto} className="w-full h-full object-cover" alt="Combustível" />
+                                                    ) : (
+                                                        <span className="text-xs text-brand-muted">Sem foto</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {/* Foto Água */}
+                                            <div className="space-y-4">
+                                                <h4 className="text-xs font-black uppercase tracking-widest text-brand-primary flex items-center gap-2">
+                                                    <Droplets className="w-4 h-4" /> Nível de Água
+                                                </h4>
+                                                <div className="aspect-square bg-brand-bg rounded-2xl border-2 border-brand-border overflow-hidden flex items-center justify-center relative group">
+                                                    {viewingLogisticsEntry.waterPhoto ? (
+                                                        <img src={viewingLogisticsEntry.waterPhoto} className="w-full h-full object-cover" alt="Água" />
+                                                    ) : (
+                                                        <span className="text-xs text-brand-muted">Sem foto</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-8 pt-8 border-t border-brand-border flex justify-between items-center">
+                                            <div>
+                                                <p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Garrafas Champagne</p>
+                                                <p className="text-2xl font-black text-brand-gold">{viewingLogisticsEntry.champagneStock || 0}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                <button onClick={handleUpdateCreds} disabled={isSavingCreds} className="mt-12 px-12 py-5 bg-brand-gold text-brand-primary rounded-[28px] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:scale-105 transition-all active:scale-95 disabled:opacity-50">
-                                    {isSavingCreds ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                                    {isSavingCreds ? 'A Criptografar...' : 'Atualizar Protocolo de Segurança'}
-                                </button>
-                            </div>
+                            )}
+
                         </div>
-                    </div>
-                )}
 
-                {/* MODAL PARA VER FOTOS LOGISTICAS (Granular) */}
-                {viewingLogisticsEntry && (
-                    <div className="fixed inset-0 z-[600] flex items-center justify-center p-6">
-                        <div className="absolute inset-0 bg-brand-dark/95 backdrop-blur-xl" onClick={() => setViewingLogisticsEntry(null)}></div>
-                        <div className="relative w-full max-w-2xl bg-white rounded-[48px] p-10 shadow-2xl animate-slideUp overflow-hidden">
-                            <div className="flex justify-between items-center mb-8">
-                                <div>
-                                    <h3 className="text-2xl font-black text-brand-dark uppercase tracking-tighter">
-                                        Auditoria: {fleet.find(b => b.id === viewingLogisticsEntry.boatId)?.name}
-                                    </h3>
-                                    <p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest mt-1">
-                                        {viewingLogisticsEntry.date} • {team.find(t => t.id === viewingLogisticsEntry.staffId)?.name}
-                                    </p>
-                                </div>
-                                <button aria-label="Fechar Modal de Auditoria" title="Fechar Modal de Auditoria" onClick={() => setViewingLogisticsEntry(null)} className="p-3 hover:bg-brand-bg rounded-2xl transition-all"><X className="w-6 h-6" /></button>
-                            </div>
+                        {/* MODAL PRINCIPAL: NOVO PASSEIO (MANTIDO) */}
+                        {
+                            isAddingTask && (
+                                <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
+                                    <div className="absolute inset-0 bg-brand-dark/95 backdrop-blur-2xl" onClick={() => setIsAddingTask(false)}></div>
+                                    <div className="relative w-full max-w-4xl bg-white rounded-[56px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slideUp">
+                                        <div className="p-8 border-b border-brand-border bg-brand-bg/50 flex items-center justify-between shrink-0">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 bg-brand-primary text-white rounded-2xl flex items-center justify-center shadow-lg"><Ship className="w-6 h-6" /></div>
+                                                <div>
+                                                    <h3 className="text-2xl font-black text-brand-dark uppercase tracking-tighter">Planear Novo Agendamento</h3>
+                                                    <p className="text-[10px] font-black text-brand-muted uppercase tracking-[0.3em] mt-1">Definição Operacional da Missão</p>
+                                                </div>
+                                            </div>
+                                            <button aria-label="Fechar Modal de Missão" title="Fechar Modal" onClick={() => setIsAddingTask(false)} className="p-4 hover:bg-white rounded-2xl transition-all shadow-sm"><X className="w-6 h-6" /></button>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
+                                            {/* ... CONTEÚDO DO FORMULÁRIO (MANTIDO) ... */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                                <div className="space-y-2">
+                                                    <label htmlFor="clientName" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Identificação do Cliente</label>
+                                                    <input id="clientName" title="Identificação do Cliente" type="text" value={newTask.clientName} onChange={e => setNewTask({ ...newTask, clientName: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary" placeholder="Ex: Reserva Manuel Porto" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label htmlFor="missionTime" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Hora de Saída</label>
+                                                    <input id="missionTime" title="Hora de Saída" type="time" value={newTask.time} onChange={e => setNewTask({ ...newTask, time: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label htmlFor="paxCount" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Nº Passageiros (PAX)</label>
+                                                    <input id="paxCount" title="Número de Passageiros" placeholder="Número de Passageiros" type="number" value={newTask.pax} onChange={e => setNewTask({ ...newTask, pax: Number(e.target.value) })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label htmlFor="assignedBoat" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Embarcação Alocada</label>
+                                                    <select id="assignedBoat" title="Selecionar Embarcação" value={newTask.boat} onChange={e => setNewTask({ ...newTask, boat: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary appearance-none">
+                                                        <option value="">Selecione Barco</option>
+                                                        {fleet.map(b => <option key={b.id} value={b.name}>{b.name} ({b.cap} PAX)</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label htmlFor="serviceType" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Tipologia</label>
+                                                    <select id="serviceType" title="Selecionar Tipologia" value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary appearance-none">
+                                                        <option value="">Selecione Tipo</option>
+                                                        {serviceTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label htmlFor="salesChannel" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Canal de Venda</label>
+                                                    <select id="salesChannel" title="Opcional: Parceiro ou Canal de Venda" value={newTask.partnerName} onChange={e => setNewTask({ ...newTask, partnerName: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary appearance-none">
+                                                        <option value="">Selecione Parceiro</option>
+                                                        {partners.map(p => <option key={p} value={p}>{p}</option>)}
+                                                    </select>
+                                                </div>
+                                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Foto Combustível */}
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-black uppercase tracking-widest text-brand-primary flex items-center gap-2">
-                                        <Zap className="w-4 h-4" /> Combustível
-                                    </h4>
-                                    <div className="aspect-square bg-brand-bg rounded-2xl border-2 border-brand-border overflow-hidden flex items-center justify-center relative group">
-                                        {viewingLogisticsEntry.fuelPhoto ? (
-                                            <img src={viewingLogisticsEntry.fuelPhoto} className="w-full h-full object-cover" alt="Combustível" />
-                                        ) : (
-                                            <span className="text-xs text-brand-muted">Sem foto</span>
-                                        )}
+                                            {/* NOVO CAMPO: OBSERVAÇÕES IMPORTANTES */}
+                                            <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
+                                                    <MessageCircle className="w-3 h-3" /> Observações Importantes (Passeio)
+                                                </label>
+                                                <textarea
+                                                    value={newTask.notes}
+                                                    onChange={e => setNewTask({ ...newTask, notes: e.target.value })}
+                                                    placeholder="Detalhes críticos para o guia/skipper (ex: Aniversário, Cliente VIP, Mobilidade Reduzida, Animais a bordo...)"
+                                                    className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-medium outline-none focus:border-brand-primary min-h-[100px] resize-none"
+                                                />
+                                            </div>
+
+                                            {/* CATERING & EXTRAS */}
+                                            <div className="bg-brand-bg/50 p-8 rounded-[40px] border border-brand-border space-y-6">
+                                                <h4 className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em] flex items-center gap-3">
+                                                    <Zap className="w-5 h-5" /> Catering & Extras (Serviço a Bordo)
+                                                </h4>
+
+                                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                                    <label className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${newTask.hasTasting ? 'bg-brand-primary/10 border-brand-primary text-brand-primary' : 'bg-white border-brand-border text-brand-muted hover:border-brand-primary/50'}`}>
+                                                        <input type="checkbox" className="hidden" checked={!!newTask.hasTasting} onChange={e => setNewTask({ ...newTask, hasTasting: e.target.checked })} />
+                                                        <span className="text-xs font-black uppercase tracking-widest mt-2">Prova Vinhos</span>
+                                                    </label>
+
+                                                    <label className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${newTask.hasPastries ? 'bg-brand-primary/10 border-brand-primary text-brand-primary' : 'bg-white border-brand-border text-brand-muted hover:border-brand-primary/50'}`}>
+                                                        <input type="checkbox" className="hidden" checked={!!newTask.hasPastries} onChange={e => setNewTask({ ...newTask, hasPastries: e.target.checked })} />
+                                                        <span className="text-xs font-black uppercase tracking-widest mt-2">Natas</span>
+                                                    </label>
+
+                                                    <label className={`flex flex-col items-center justify-center p-4 rounded-2xl border transition-all cursor-pointer ${newTask.hasLunch ? 'bg-brand-primary/10 border-brand-primary text-brand-primary' : 'bg-white border-brand-border text-brand-muted hover:border-brand-primary/50'}`}>
+                                                        <input type="checkbox" className="hidden" checked={!!newTask.hasLunch} onChange={e => setNewTask({ ...newTask, hasLunch: e.target.checked })} />
+                                                        <span className="text-xs font-black uppercase tracking-widest mt-2">Almoço</span>
+                                                    </label>
+
+                                                    <div className="space-y-2">
+                                                        <label className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Extras de Bebida</label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Ex: Espumante, Murganheira"
+                                                            value={newTask.extraDrinks?.join(', ') || ''}
+                                                            onChange={e => setNewTask({ ...newTask, extraDrinks: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                                                            className="w-full bg-white border border-brand-border rounded-[16px] px-4 py-3 text-xs font-bold outline-none focus:border-brand-primary"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {newTask.hasLunch && (
+                                                    <div className="mt-4 pt-4 border-t border-brand-border/50">
+                                                        <label className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Restaurante (Almoço)</label>
+                                                        <select
+                                                            title="Local do Almoço"
+                                                            value={newTask.lunchLocation || ''}
+                                                            onChange={e => setNewTask({ ...newTask, lunchLocation: e.target.value })}
+                                                            className="w-full mt-2 bg-white border border-brand-border rounded-[16px] px-4 py-3 text-xs font-bold outline-none focus:border-brand-primary"
+                                                        >
+                                                            <option value="">Selecione o Restaurante</option>
+                                                            <option value="Cais da Foz">Cais da Foz</option>
+                                                            <option value="LBV">LBV</option>
+                                                            <option value="Cozinha da Clara (Rosa)">Cozinha da Clara - Quinta de la Rosa</option>
+                                                            <option value="Outro">Outro (Indicar nas Observações)</option>
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* GESTÃO FINANCEIRA E COBRANÇAS NO CAIS */}
+                                            <div className="bg-white p-8 rounded-[40px] border border-brand-border space-y-6 shadow-sm">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-[10px] font-black text-brand-dark uppercase tracking-[0.3em] flex items-center gap-3">
+                                                        <Tag className="w-5 h-5 text-green-500" /> Cobrança no Cais
+                                                    </h4>
+                                                    <label className="relative inline-flex items-center cursor-pointer" title="Habilitar Cobrança">
+                                                        <input type="checkbox" title="Requer Cobrança" className="sr-only peer" checked={!!newTask.requiresCollection} onChange={e => setNewTask({ ...newTask, requiresCollection: e.target.checked })} />
+                                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                                                    </label>
+                                                </div>
+
+                                                {newTask.requiresCollection && (
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-brand-border">
+                                                        <div className="space-y-2">
+                                                            <label htmlFor="collectionAmount" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Valor a Cobrar (€)</label>
+                                                            <input
+                                                                id="collectionAmount"
+                                                                type="number"
+                                                                value={newTask.collectionAmount || ''}
+                                                                onChange={e => setNewTask({ ...newTask, collectionAmount: Number(e.target.value) })}
+                                                                className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-green-500 text-green-700"
+                                                                placeholder="Ex: 190"
+                                                            />
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <label htmlFor="collectionMethod" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Método de Cobrança</label>
+                                                            <select
+                                                                id="collectionMethod"
+                                                                value={newTask.collectionMethod || 'CASH'}
+                                                                onChange={e => setNewTask({ ...newTask, collectionMethod: e.target.value as 'CASH' | 'CARD' | 'MIXED' | 'PENDING' })}
+                                                                className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-green-500"
+                                                            >
+                                                                <option value="CASH">Dinheiro Vivo</option>
+                                                                <option value="CARD">Cartão (TPA)</option>
+                                                                <option value="MIXED">Misto</option>
+                                                                <option value="PENDING">A Definir pelo Guia</option>
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+
+                                            {/* ... Crew Scheduling (MANTIDO) ... */}
+                                            <div className="bg-brand-bg/50 p-8 rounded-[40px] border-2 border-brand-primary/10 space-y-8 shadow-inner">
+                                                <h4 className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em] flex items-center gap-3">
+                                                    <UserCheck className="w-5 h-5" /> Crew Scheduling & Intelligence
+                                                </h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                                                    <div className="space-y-3">
+                                                        <label htmlFor="skipperSelect" className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Comandante (Skipper)</label>
+                                                        <select
+                                                            id="skipperSelect"
+                                                            title="Selecionar Skipper"
+                                                            value={newTask.crew?.condutor}
+                                                            onChange={e => setNewTask({ ...newTask, crew: { ...newTask.crew!, condutor: e.target.value } })}
+                                                            className="w-full bg-white border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary shadow-sm"
+                                                        >
+                                                            <option value="">Definir Skipper</option>
+                                                            {team.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        <label htmlFor="assistantSelect" className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Apoio (Assistente)</label>
+                                                        <select
+                                                            id="assistantSelect"
+                                                            title="Selecionar Assistente"
+                                                            value={newTask.crew?.assistente}
+                                                            onChange={e => setNewTask({ ...newTask, crew: { ...newTask.crew!, assistente: e.target.value } })}
+                                                            className="w-full bg-white border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary shadow-sm"
+                                                        >
+                                                            <option value="">Definir Apoio</option>
+                                                            {team.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        <label htmlFor="guideSelect" className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Anfitrião (Guia)</label>
+                                                        <select
+                                                            id="guideSelect"
+                                                            title="Selecionar Guia"
+                                                            value={newTask.crew?.guia}
+                                                            onChange={e => setNewTask({ ...newTask, crew: { ...newTask.crew!, guia: e.target.value } })}
+                                                            className="w-full bg-white border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary shadow-sm"
+                                                        >
+                                                            <option value="">Não necessário</option>
+                                                            {guides.map(guide => <option key={guide} value={guide}>{guide}</option>)}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-10 bg-brand-bg/50 border-t border-brand-border flex gap-4 shrink-0">
+                                                <button
+                                                    onClick={() => setIsAddingTask(false)}
+                                                    className="flex-1 py-6 bg-white border border-brand-border text-brand-muted rounded-[28px] font-black text-xs uppercase tracking-[0.3em] hover:bg-brand-bg transition-all"
+                                                >
+                                                    Cancelar
+                                                </button>
+                                                <button onClick={handleSaveTask} className="flex-[2] py-6 bg-brand-primary text-white rounded-[28px] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-primary-dark hover:scale-[1.02] active:scale-95 transition-all">
+                                                    {editingTask ? 'Atualizar Missão' : 'Confirmar & Mobilizar Tripulação'}
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                                {/* Foto Água */}
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-black uppercase tracking-widest text-brand-primary flex items-center gap-2">
-                                        <Droplets className="w-4 h-4" /> Nível de Água
-                                    </h4>
-                                    <div className="aspect-square bg-brand-bg rounded-2xl border-2 border-brand-border overflow-hidden flex items-center justify-center relative group">
-                                        {viewingLogisticsEntry.waterPhoto ? (
-                                            <img src={viewingLogisticsEntry.waterPhoto} className="w-full h-full object-cover" alt="Água" />
-                                        ) : (
-                                            <span className="text-xs text-brand-muted">Sem foto</span>
-                                        )}
+                            )
+                        }
+
+                        {/* MODAL: ADICIONAR RECURSOS (MANTIDO) */}
+                        <AnimatePresence>
+                            {isAuthoritiesModalOpen && (
+                                <div className="fixed inset-0 z-[600] flex items-center justify-center p-4">
+                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setIsAuthoritiesModalOpen(false)}></motion.div>
+                                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-2xl bg-[#0A101C] border border-white/10 rounded-[40px] p-10 shadow-2xl overflow-hidden max-h-[85vh] flex flex-col">
+                                        <div className="flex justify-between items-center mb-8 shrink-0">
+                                            <div>
+                                                <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Directório de Autoridades</h3>
+                                                <p className="text-[10px] font-black text-brand-gold uppercase tracking-[0.3em] mt-1">Contactos Oficiais APDL & Marinha</p>
+                                            </div>
+                                            <button onClick={() => setIsAuthoritiesModalOpen(false)} title="Fechar" className="w-12 h-12 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center justify-center text-white transition-colors"><X className="w-6 h-6" /></button>
+                                        </div>
+
+                                        <div className="flex-1 overflow-y-auto no-scrollbar space-y-10">
+                                            {[
+                                                {
+                                                    category: 'Autoridades Marítimas',
+                                                    contacts: [
+                                                        { name: 'Capitania do Porto do Douro', phone: '+351 222 070 970', email: 'capitania.douro@amn.pt' },
+                                                        { name: 'Delegação Marítima da Régua', phone: '+351 254 322 622', email: 'delegmar.regua@amn.pt' },
+                                                        { name: 'Polícia Marítima (Douro)', phone: '+351 916 352 918' },
+                                                        { name: 'Polícia Marítima (Régua)', phone: '+351 916 352 995' }
+                                                    ]
+                                                },
+                                                {
+                                                    category: 'APDL - Gestão da Via',
+                                                    contacts: [
+                                                        { name: 'Sede Douro (Peso da Régua)', phone: '+351 254 320 030', email: 'geral@apdl.pt' },
+                                                        { name: 'Coordenação KM 6 (Porto)', email: 'km6@apdl.pt' },
+                                                        { name: 'Serviço de Eclusagem', phone: '+351 254 320 034' }
+                                                    ]
+                                                },
+                                                {
+                                                    category: 'Ambiente & Recursos',
+                                                    contacts: [
+                                                        { name: 'Agência Portuguesa do Ambiente', phone: '+351 223 400 000', email: 'arhn.geral@apambiente.pt' },
+                                                        { name: 'Douro Interior (Mirandela)', phone: '+351 278 265 026' }
+                                                    ]
+                                                }
+                                            ].map((cat, i) => (
+                                                <div key={i} className="space-y-4">
+                                                    <h4 className="text-[11px] font-black text-white/30 uppercase tracking-[0.2em]">{cat.category}</h4>
+                                                    <div className="grid grid-cols-1 gap-3">
+                                                        {cat.contacts.map((contact, j) => (
+                                                            <div key={j} className="p-6 bg-white/5 border border-white/5 rounded-3xl group hover:border-brand-gold/30 transition-all">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div>
+                                                                        <h5 className="font-bold text-white mb-2">{contact.name}</h5>
+                                                                        <div className="flex flex-col gap-1">
+                                                                            {contact.phone && <a href={`tel:${contact.phone.replace(/\s/g, '')}`} className="text-xs text-brand-gold font-bold hover:underline flex items-center gap-2"><Phone className="w-3 h-3" /> {contact.phone}</a>}
+                                                                            {contact.email && <a href={`mailto:${contact.email}`} className="text-xs text-white/40 hover:text-white transition-colors flex items-center gap-2"><Mail className="w-3 h-3" /> {contact.email}</a>}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="w-10 h-10 rounded-full border border-white/10 flex items-center justify-center text-white/20 group-hover:text-brand-gold group-hover:border-brand-gold/50 transition-all">
+                                                                        <Phone className="w-4 h-4" />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="pt-8 mt-8 border-t border-white/5 flex gap-4 shrink-0">
+                                            <div className="flex-1 bg-white/5 p-4 rounded-2xl flex items-center gap-4">
+                                                <AlertTriangle className="w-6 h-6 text-red-500" />
+                                                <div>
+                                                    <p className="text-[10px] font-black text-white uppercase">Vigilância Permanente</p>
+                                                    <p className="text-[9px] text-white/40 leading-tight">O VHF Canal 16 deve ser mantido em escuta contínua durante a navegação.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                </div>
+                            )}
+                        </AnimatePresence>
+
+                        {
+                            isAddingResource && (
+                                <div className="fixed inset-0 z-[600] flex items-center justify-center p-6">
+                                    <div className="absolute inset-0 bg-[#070b14]/90 backdrop-blur-md" onClick={() => setIsAddingResource(null)}></div>
+                                    <div className="relative w-full max-w-lg bg-[#0A101C] rounded-[48px] p-10 shadow-2xl animate-slideUp overflow-hidden border-t-4 border-brand-gold border-x border-b border-x-white/10 border-b-white/10">
+                                        <div className="absolute inset-0 z-[5] opacity-[0.06] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]"></div>
+                                        <div className="relative z-10">
+                                            {/* ... CONTEÚDO DOS MODAIS DE RECURSOS MANTIDO ... */}
+                                            <div className="flex justify-between items-center mb-8">
+                                                <div>
+                                                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter">
+                                                        {isAddingResource === 'STAFF' ? (editingStaff ? 'Editar Staff' : 'Novo Staff') :
+                                                            (isAddingResource === 'BOAT' ? (editingBoat ? 'Editar Barco' : 'Novo Barco') : isAddingResource)}
+                                                    </h3>
+                                                    <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mt-1">Gestão de Ativos Deltatur</p>
+                                                </div>
+                                                <button onClick={() => setIsAddingResource(null)} className="p-3 bg-white/5 text-white/50 hover:text-white hover:bg-white/10 rounded-2xl transition-all" aria-label="Fechar Modal" title="Fechar Modal"><X className="w-6 h-6" /></button>
+                                            </div>
+                                            <div className="space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar px-1">
+                                                {/* STAFF, BOAT, PARTNER FORMS (MANTIDOS) */}
+                                                {isAddingResource === 'STAFF' && (
+                                                    <>
+                                                        <input type="text" placeholder="Nome do Membro" title="Nome do Membro" value={newStaff.name} onChange={e => setNewStaff({ ...newStaff, name: e.target.value })} className="w-full p-5 bg-black/40 text-white placeholder-white/30 border border-white/10 rounded-[24px] outline-none font-bold focus:border-brand-gold focus:bg-white/5 transition-all" />
+                                                        <button onClick={handleSaveStaff} title="Guardar Staff" className="w-full py-5 bg-brand-gold text-[#0A101C] rounded-[24px] font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-brand-gold/20 hover:scale-[1.02] hover:bg-yellow-400 transition-all">Guardar Staff</button>
+                                                    </>
+                                                )}
+                                                {isAddingResource === 'BOAT' && (
+                                                    <>
+                                                        <input type="text" placeholder="Nome Barco" title="Nome Barco" value={newBoat.name} onChange={e => setNewBoat({ ...newBoat, name: e.target.value })} className="w-full p-5 bg-black/40 text-white placeholder-white/30 border border-white/10 rounded-[24px] outline-none font-bold focus:border-brand-gold focus:bg-white/5 transition-all" />
+                                                        <input type="number" placeholder="Capacidade" title="Capacidade" value={newBoat.cap} onChange={e => setNewBoat({ ...newBoat, cap: Number(e.target.value) })} className="w-full p-5 bg-black/40 text-white placeholder-white/30 border border-white/10 rounded-[24px] outline-none font-bold focus:border-brand-gold focus:bg-white/5 transition-all" />
+                                                        <button onClick={handleAddBoat} title="Guardar Barco" className="w-full py-5 bg-brand-gold text-[#0A101C] rounded-[24px] font-black uppercase tracking-[0.2em] text-xs shadow-lg shadow-brand-gold/20 hover:scale-[1.02] hover:bg-yellow-400 transition-all">Guardar Barco</button>
+                                                    </>
+                                                )}
+                                                {/* ... (Partner/Type Forms Mantidos) ... */}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div className="mt-8 pt-8 border-t border-brand-border flex justify-between items-center">
-                                <div>
-                                    <p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest">Garrafas Champagne</p>
-                                    <p className="text-2xl font-black text-brand-gold">{viewingLogisticsEntry.champagneStock || 0}</p>
-                                </div>
-                            </div>
-                        </div>
+                            )}
                     </div>
-                )}
-
+                </div>
             </div>
-
-            {/* MODAL PRINCIPAL: NOVO PASSEIO (MANTIDO) */}
-            {isAddingTask && (
-                <div className="fixed inset-0 z-[500] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-brand-dark/95 backdrop-blur-2xl" onClick={() => setIsAddingTask(false)}></div>
-                    <div className="relative w-full max-w-4xl bg-white rounded-[56px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-slideUp">
-                        <div className="p-8 border-b border-brand-border bg-brand-bg/50 flex items-center justify-between shrink-0">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-brand-primary text-white rounded-2xl flex items-center justify-center shadow-lg"><Ship className="w-6 h-6" /></div>
-                                <div>
-                                    <h3 className="text-2xl font-black text-brand-dark uppercase tracking-tighter">Planear Novo Agendamento</h3>
-                                    <p className="text-[10px] font-black text-brand-muted uppercase tracking-[0.3em] mt-1">Definição Operacional da Missão</p>
-                                </div>
-                            </div>
-                            <button aria-label="Fechar Modal de Missão" title="Fechar Modal" onClick={() => setIsAddingTask(false)} className="p-4 hover:bg-white rounded-2xl transition-all shadow-sm"><X className="w-6 h-6" /></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-10 space-y-10 custom-scrollbar">
-                            {/* ... CONTEÚDO DO FORMULÁRIO (MANTIDO) ... */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="space-y-2">
-                                    <label htmlFor="clientName" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Identificação do Cliente</label>
-                                    <input id="clientName" title="Identificação do Cliente" type="text" value={newTask.clientName} onChange={e => setNewTask({ ...newTask, clientName: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary" placeholder="Ex: Reserva Manuel Porto" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="missionTime" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Hora de Saída</label>
-                                    <input id="missionTime" title="Hora de Saída" type="time" value={newTask.time} onChange={e => setNewTask({ ...newTask, time: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="paxCount" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Nº Passageiros (PAX)</label>
-                                    <input id="paxCount" title="Número de Passageiros" placeholder="Número de Passageiros" type="number" value={newTask.pax} onChange={e => setNewTask({ ...newTask, pax: Number(e.target.value) })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary" />
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="assignedBoat" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Embarcação Alocada</label>
-                                    <select id="assignedBoat" title="Selecionar Embarcação" value={newTask.boat} onChange={e => setNewTask({ ...newTask, boat: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary appearance-none">
-                                        <option value="">Selecione Barco</option>
-                                        {fleet.map(b => <option key={b.id} value={b.name}>{b.name} ({b.cap} PAX)</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="serviceType" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Tipologia</label>
-                                    <select id="serviceType" title="Selecionar Tipologia" value={newTask.type} onChange={e => setNewTask({ ...newTask, type: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary appearance-none">
-                                        <option value="">Selecione Tipo</option>
-                                        {serviceTypes.map(s => <option key={s} value={s}>{s}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label htmlFor="salesChannel" className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Canal de Venda</label>
-                                    <select id="salesChannel" title="Opcional: Parceiro ou Canal de Venda" value={newTask.partnerName} onChange={e => setNewTask({ ...newTask, partnerName: e.target.value })} className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary appearance-none">
-                                        <option value="">Selecione Parceiro</option>
-                                        {partners.map(p => <option key={p} value={p}>{p}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-
-                            {/* NOVO CAMPO: OBSERVAÇÕES IMPORTANTES */}
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1 flex items-center gap-2">
-                                    <MessageCircle className="w-3 h-3" /> Observações Importantes (Passeio)
-                                </label>
-                                <textarea
-                                    value={newTask.notes}
-                                    onChange={e => setNewTask({ ...newTask, notes: e.target.value })}
-                                    placeholder="Detalhes críticos para o guia/skipper (ex: Aniversário, Cliente VIP, Mobilidade Reduzida, Animais a bordo...)"
-                                    className="w-full bg-brand-bg border border-brand-border rounded-[20px] px-6 py-4 text-sm font-medium outline-none focus:border-brand-primary min-h-[100px] resize-none"
-                                />
-                            </div>
-
-                            {/* ... Crew Scheduling (MANTIDO) ... */}
-                            <div className="bg-brand-bg/50 p-8 rounded-[40px] border-2 border-brand-primary/10 space-y-8 shadow-inner">
-                                <h4 className="text-[10px] font-black text-brand-primary uppercase tracking-[0.3em] flex items-center gap-3">
-                                    <UserCheck className="w-5 h-5" /> Crew Scheduling & Intelligence
-                                </h4>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                    <div className="space-y-3">
-                                        <label htmlFor="skipperSelect" className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Comandante (Skipper)</label>
-                                        <select
-                                            id="skipperSelect"
-                                            title="Selecionar Skipper"
-                                            value={newTask.crew?.condutor}
-                                            onChange={e => setNewTask({ ...newTask, crew: { ...newTask.crew!, condutor: e.target.value } })}
-                                            className="w-full bg-white border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary shadow-sm"
-                                        >
-                                            <option value="">Definir Skipper</option>
-                                            {team.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label htmlFor="assistantSelect" className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Apoio (Assistente)</label>
-                                        <select
-                                            id="assistantSelect"
-                                            title="Selecionar Assistente"
-                                            value={newTask.crew?.assistente}
-                                            onChange={e => setNewTask({ ...newTask, crew: { ...newTask.crew!, assistente: e.target.value } })}
-                                            className="w-full bg-white border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary shadow-sm"
-                                        >
-                                            <option value="">Definir Apoio</option>
-                                            {team.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label htmlFor="guideSelect" className="text-[9px] font-black text-brand-muted uppercase tracking-[0.2em] ml-1">Anfitrião (Guia)</label>
-                                        <select
-                                            id="guideSelect"
-                                            title="Selecionar Guia"
-                                            value={newTask.crew?.guia}
-                                            onChange={e => setNewTask({ ...newTask, crew: { ...newTask.crew!, guia: e.target.value } })}
-                                            className="w-full bg-white border border-brand-border rounded-[20px] px-6 py-4 text-sm font-bold outline-none focus:border-brand-primary shadow-sm"
-                                        >
-                                            <option value="">Não necessário</option>
-                                            {guides.map(guide => <option key={guide} value={guide}>{guide}</option>)}
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="p-10 bg-brand-bg/50 border-t border-brand-border flex gap-4 shrink-0">
-                                <button
-                                    onClick={() => setIsAddingTask(false)}
-                                    className="flex-1 py-6 bg-white border border-brand-border text-brand-muted rounded-[28px] font-black text-xs uppercase tracking-[0.3em] hover:bg-brand-bg transition-all"
-                                >
-                                    Cancelar
-                                </button>
-                                <button onClick={handleSaveTask} className="flex-[2] py-6 bg-brand-primary text-white rounded-[28px] font-black text-xs uppercase tracking-[0.3em] shadow-2xl hover:bg-brand-primary-dark hover:scale-[1.02] active:scale-95 transition-all">
-                                    {editingTask ? 'Atualizar Missão' : 'Confirmar & Mobilizar Tripulação'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL: ADICIONAR RECURSOS (MANTIDO) */}
-            {isAddingResource && (
-                <div className="fixed inset-0 z-[600] flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-brand-dark/90 backdrop-blur-md" onClick={() => setIsAddingResource(null)}></div>
-                    <div className="relative w-full max-w-lg bg-white rounded-[48px] p-10 shadow-2xl animate-slideUp overflow-hidden border-t-8 border-brand-gold">
-                        {/* ... CONTEÚDO DOS MODAIS DE RECURSOS MANTIDO ... */}
-                        <div className="flex justify-between items-center mb-8">
-                            <div>
-                                <h3 className="text-2xl font-black text-brand-dark uppercase tracking-tighter">
-                                    {isAddingResource === 'STAFF' ? (editingStaff ? 'Editar Staff' : 'Novo Staff') :
-                                        (isAddingResource === 'BOAT' ? (editingBoat ? 'Editar Barco' : 'Novo Barco') : isAddingResource)}
-                                </h3>
-                                <p className="text-[10px] font-bold text-brand-muted uppercase tracking-widest mt-1">Gestão de Ativos Deltatur</p>
-                            </div>
-                            <button onClick={() => setIsAddingResource(null)} className="p-3 hover:bg-brand-bg rounded-2xl transition-all"><X className="w-6 h-6" /></button>
-                        </div>
-                        <div className="space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar px-1">
-                            {/* STAFF, BOAT, PARTNER FORMS (MANTIDOS) */}
-                            {isAddingResource === 'STAFF' && (
-                                <>
-                                    <input type="text" placeholder="Nome do Membro" value={newStaff.name} onChange={e => setNewStaff({ ...newStaff, name: e.target.value })} className="w-full p-5 bg-brand-bg border border-brand-border rounded-2xl outline-none font-bold focus:border-brand-primary" />
-                                    <button onClick={handleSaveStaff} className="w-full py-5 bg-brand-primary text-white rounded-2xl font-black uppercase tracking-widest text-xs">Guardar Staff</button>
-                                </>
-                            )}
-                            {isAddingResource === 'BOAT' && (
-                                <>
-                                    <input type="text" placeholder="Nome Barco" value={newBoat.name} onChange={e => setNewBoat({ ...newBoat, name: e.target.value })} className="w-full p-5 bg-brand-bg border border-brand-border rounded-2xl outline-none font-bold focus:border-brand-primary" />
-                                    <input type="number" placeholder="Capacidade" value={newBoat.cap} onChange={e => setNewBoat({ ...newBoat, cap: Number(e.target.value) })} className="w-full p-5 bg-brand-bg border border-brand-border rounded-2xl outline-none font-bold focus:border-brand-primary" />
-                                    <button onClick={handleAddBoat} className="w-full py-5 bg-brand-primary text-white rounded-2xl font-black uppercase tracking-widest text-xs">Guardar Barco</button>
-                                </>
-                            )}
-                            {/* ... (Partner/Type Forms Mantidos) ... */}
-                        </div>
-                    </div>
-                </div>
-            )}
             <style>{`
           .custom-scrollbar::-webkit-scrollbar { width: 8px; }
           .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
