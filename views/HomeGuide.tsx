@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ServiceTask, UserProfile, AppView, WeatherConditions, Boat, StaffMember, LogisticsTaskEntry, LogisticsTaskType, NavStatus } from '../types';
+import { ServiceTask, UserProfile, AppView, WeatherConditions, Boat, StaffMember, LogisticsTaskEntry, LogisticsTaskType, NavStatus, RiverAlert } from '../types';
 import {
     Ship, ChevronRight, Waves, Zap, AlertTriangle, ShieldCheck,
     Thermometer, Wind, RefreshCw, Loader2, Info, Navigation2,
@@ -25,12 +25,15 @@ interface HomeGuideProps {
     navStatus: NavStatus | null;
     isUpdatingNav: boolean;
     onRefreshNav: () => void;
+    riverAlerts?: RiverAlert[];
+    onAddRiverAlert?: (alert: RiverAlert) => void;
 }
 
 const HomeGuide: React.FC<HomeGuideProps> = ({
     user, tasks, onNavigate, fleet = [], team = [], onUpdateFleet,
     logisticsRegistry = [], onUpdateLogistics,
-    navStatus, isUpdatingNav, onRefreshNav
+    navStatus, isUpdatingNav, onRefreshNav,
+    riverAlerts = [], onAddRiverAlert
 }) => {
     const [weather, setWeather] = useState<WeatherConditions | null>(null);
     const [loading, setLoading] = useState(false);
@@ -47,6 +50,11 @@ const HomeGuide: React.FC<HomeGuideProps> = ({
     const [isSunsetMode, setIsSunsetMode] = useState(false);
     const [isAnchorModalOpen, setIsAnchorModalOpen] = useState(false);
     const [isAnchorArmed, setIsAnchorArmed] = useState(false);
+
+    // River Security Feed State
+    const [isRiverFeedOpen, setIsRiverFeedOpen] = useState(false);
+    const [newAlertMsg, setNewAlertMsg] = useState('');
+    const [newAlertType, setNewAlertType] = useState<'DANGER' | 'INFO' | 'OP'>('DANGER');
 
     // Physics Simulation Effect
     useEffect(() => {
@@ -404,7 +412,7 @@ const HomeGuide: React.FC<HomeGuideProps> = ({
             </section>
 
             {/* QUICK PROTOCOLS */}
-            <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button className={`p-8 rounded-[48px] text-left shadow-glass hover:shadow-spatial transition-all hover:-translate-y-1 group relative overflow-hidden focus:outline-none ${isAnchorArmed ? 'bg-gradient-to-br from-green-500 to-[#0A2F1F] text-white' : 'bg-[#0A2F1F] text-white'}`} onClick={() => { vibrate(50); setIsAnchorModalOpen(true); }}>
                     <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform"><Anchor className="w-32 h-32" /></div>
                     <div className="relative z-10">
@@ -441,6 +449,13 @@ const HomeGuide: React.FC<HomeGuideProps> = ({
                     <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-white transition-colors shadow-sm"><Radio className="w-7 h-7 text-red-600 animate-pulse" strokeWidth={3} /></div>
                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-500 mb-2">Comunicação Crítica</p>
                     <h4 className="text-2xl font-bold font-['Cormorant_Garamond'] italic">SOS Direct Line</h4>
+                </button>
+
+                <button className="bg-[#2D0A0A] p-8 rounded-[48px] border border-red-900/50 text-left text-white shadow-glass hover:bg-[#3D0F0F] hover:shadow-spatial transition-all hover:-translate-y-1 group relative overflow-hidden focus:outline-none" onClick={() => { vibrate(30); setIsRiverFeedOpen(true); }}>
+                    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:scale-110 transition-transform"><AlertTriangle className="w-32 h-32 text-red-500" /></div>
+                    <div className="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-red-500/20 transition-colors shadow-inner"><AlertTriangle className="w-7 h-7 text-red-500" strokeWidth={3} /></div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-red-400 mb-2">Reporte Comunitário</p>
+                    <h4 className="text-2xl font-bold font-['Cormorant_Garamond'] italic flex items-center gap-2">River Feed <span className="text-[10px] bg-red-500 text-white px-2 py-1 rounded-full not-italic tracking-widest">{riverAlerts.filter(a => a.active).length}</span></h4>
                 </button>
             </section>
 
@@ -514,6 +529,92 @@ const HomeGuide: React.FC<HomeGuideProps> = ({
                     )}
                 </div>
             </section>
+
+            {/* RIVER SECURITY FEED MODAL */}
+            <AnimatePresence>
+                {isRiverFeedOpen && (
+                    <div className="fixed inset-0 z-[500] flex items-end justify-center sm:items-center p-0 sm:p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="absolute inset-0 bg-[#070b14]/95 backdrop-blur-xl" onClick={() => setIsRiverFeedOpen(false)}></motion.div>
+                        <motion.div
+                            initial={{ y: '100%', scale: 0.95 }} animate={{ y: 0, scale: 1 }} exit={{ y: '100%', scale: 0.95 }} transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="relative w-full max-w-2xl bg-[#0F172A] rounded-t-[48px] sm:rounded-[48px] p-8 pb-10 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border-t border-white/20"
+                        >
+                            <div className="w-full flex justify-center pb-6 sm:hidden"><div className="w-12 h-1.5 bg-white/20 rounded-full"></div></div>
+                            <div className="flex justify-between items-center mb-8">
+                                <div>
+                                    <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.4em] mb-2 flex items-center gap-2"><AlertTriangle className="w-3 h-3" /> Segurança de Frota</p>
+                                    <h3 className="text-3xl font-['Cormorant_Garamond'] font-bold text-white italic">River Security Feed</h3>
+                                </div>
+                                <button onClick={() => setIsRiverFeedOpen(false)} title="Fechar Feed" aria-label="Fechar Feed" className="w-12 h-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/50 hover:text-white hover:bg-white/10 transition-colors"><X className="w-6 h-6" /></button>
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-8 flex flex-col gap-4">
+                                <p className="text-[10px] font-bold text-brand-gold uppercase tracking-[0.3em]">Criar Alerta Rápido</p>
+                                <textarea
+                                    value={newAlertMsg}
+                                    onChange={(e) => setNewAlertMsg(e.target.value)}
+                                    placeholder="Ex: Troncos gigantes a flutuar no KM 122 perto da margem Norte..."
+                                    className="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:border-red-500 transition-colors resize-none h-24 font-medium"
+                                />
+                                <div className="flex justify-between items-center">
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setNewAlertType('DANGER')} className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-colors ${newAlertType === 'DANGER' ? 'bg-red-500/20 text-red-400 border border-red-500/50' : 'bg-white/5 text-white/40 hover:text-white'}`}>Perigo</button>
+                                        <button onClick={() => setNewAlertType('INFO')} className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-colors ${newAlertType === 'INFO' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50' : 'bg-white/5 text-white/40 hover:text-white'}`}>Info</button>
+                                        <button onClick={() => setNewAlertType('OP')} className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase transition-colors ${newAlertType === 'OP' ? 'bg-brand-gold/20 text-brand-gold border border-brand-gold/50' : 'bg-white/5 text-white/40 hover:text-white'}`}>Operações</button>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (!newAlertMsg) return;
+                                            if (onAddRiverAlert) {
+                                                onAddRiverAlert({
+                                                    id: Date.now().toString(),
+                                                    type: newAlertType,
+                                                    message: newAlertMsg,
+                                                    reporter: user.name,
+                                                    timestamp: new Date().toISOString(),
+                                                    active: true
+                                                });
+                                            }
+                                            setNewAlertMsg('');
+                                        }}
+                                        className="bg-red-600 hover:bg-red-500 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 transition-all active:scale-95"
+                                    >
+                                        <Zap className="w-3.5 h-3.5" /> Reportar
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pr-2">
+                                {riverAlerts.filter(a => a.active).length === 0 ? (
+                                    <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl opacity-50">
+                                        <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-500" />
+                                        <p className="text-xs font-black uppercase tracking-[0.3em] text-white">Rio Seguro • Sem alertas ativos</p>
+                                    </div>
+                                ) : (
+                                    riverAlerts.filter(a => a.active).map(alert => (
+                                        <div key={alert.id} className={`p-5 rounded-2xl border ${alert.type === 'DANGER' ? 'bg-red-500/10 border-red-500/30' : (alert.type === 'INFO' ? 'bg-blue-500/10 border-blue-500/30' : 'bg-brand-gold/10 border-brand-gold/30')}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    {alert.type === 'DANGER' ? <AlertTriangle className="w-4 h-4 text-red-500" /> : (alert.type === 'INFO' ? <InfoIcon className="w-4 h-4 text-blue-500" /> : <Ship className="w-4 h-4 text-brand-gold" />)}
+                                                    <span className={`text-[10px] font-black tracking-widest uppercase ${alert.type === 'DANGER' ? 'text-red-500' : (alert.type === 'INFO' ? 'text-blue-500' : 'text-brand-gold')}`}>
+                                                        {alert.type}
+                                                    </span>
+                                                </div>
+                                                <span className="text-[9px] text-white/30 font-bold">{new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                            <p className="text-sm font-medium text-white/90 leading-relaxed mb-3">"{alert.message}"</p>
+                                            <div className="flex items-center gap-2 mt-auto">
+                                                <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-[8px] font-bold text-white/50">{alert.reporter.charAt(0)}</div>
+                                                <span className="text-[10px] font-black tracking-widest text-white/40 uppercase">Por: {alert.reporter}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* LOGISTICS MODAL */}
             <AnimatePresence>

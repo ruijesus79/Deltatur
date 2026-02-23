@@ -1,7 +1,7 @@
 
 // App.tsx: Gestor Central de Estado e Navegação
 import React, { useState, useEffect } from 'react';
-import { AppView, UserProfile, ServiceTask, Boat, KnowledgeArticle, GalleryImage, AppNotification, DocumentResource, StaffMember, EmergencyContact, LogisticsTaskEntry, NavStatus } from './types';
+import { AppView, UserProfile, ServiceTask, Boat, KnowledgeArticle, GalleryImage, AppNotification, DocumentResource, StaffMember, EmergencyContact, LogisticsTaskEntry, NavStatus, RiverAlert } from './types';
 import Login from './views/Login';
 import HomeLanding from './views/HomeLanding';
 import HomeGuide from './views/HomeGuide';
@@ -47,6 +47,7 @@ const App: React.FC = () => {
     const [team, setTeam] = useState<StaffMember[]>([]);
     // Novo State para Logística Granular
     const [logisticsRegistry, setLogisticsRegistry] = useState<LogisticsTaskEntry[]>([]);
+    const [riverAlerts, setRiverAlerts] = useState<RiverAlert[]>([]);
 
     const [guides, setGuides] = useState<string[]>([]);
     const [partners, setPartners] = useState<string[]>([]);
@@ -128,6 +129,7 @@ const App: React.FC = () => {
         setPartners(safeParse('deltatur_db_partners', PARTNERS));
         setServiceTypes(safeParse('deltatur_db_types', SERVICE_TYPES));
         setEmergencyContacts(safeParse('deltatur_db_emergency', INITIAL_EMERGENCY_CONTACTS));
+        setRiverAlerts(safeParse('deltatur_db_river_alerts', []));
 
         const loadMedia = async () => {
             try {
@@ -158,6 +160,10 @@ const App: React.FC = () => {
                         setLogisticsRegistry(parsed);
                         if (user?.role === 'GUIDE') pushNotification("Logística Atualizada", "Novos abastecimentos registados", "INFO");
                         break;
+                    case 'deltatur_db_river_alerts':
+                        setRiverAlerts(parsed);
+                        if (user?.role === 'GUIDE') pushNotification("Alerta de Rio", "Novo alerta comunitário reportado", "ALERT");
+                        break;
                     case 'deltatur_db_chat':
                         if (parsed && parsed.length > 0) {
                             const lastMsg = parsed[parsed.length - 1];
@@ -185,6 +191,18 @@ const App: React.FC = () => {
     const updateLogistics = (items: LogisticsTaskEntry[]) => {
         setLogisticsRegistry(items);
         localStorage.setItem('deltatur_db_logistics', JSON.stringify(items));
+    };
+
+    const handleAddRiverAlert = (alert: RiverAlert) => {
+        const updatedAlerts = [alert, ...riverAlerts];
+        setRiverAlerts(updatedAlerts);
+        localStorage.setItem('deltatur_db_river_alerts', JSON.stringify(updatedAlerts));
+    };
+
+    const handleUpdateRiverAlert = (updatedAlert: RiverAlert) => {
+        const updatedAlerts = riverAlerts.map(a => a.id === updatedAlert.id ? updatedAlert : a);
+        setRiverAlerts(updatedAlerts);
+        localStorage.setItem('deltatur_db_river_alerts', JSON.stringify(updatedAlerts));
     };
 
     const fetchNavNotices = async () => {
@@ -229,6 +247,8 @@ const App: React.FC = () => {
                     navStatus={navStatus}
                     isUpdatingNav={isUpdatingNav}
                     onRefreshNav={fetchNavNotices}
+                    riverAlerts={riverAlerts}
+                    onAddRiverAlert={handleAddRiverAlert}
                 />
             );
             case AppView.ADMIN_DASHBOARD:
@@ -240,6 +260,8 @@ const App: React.FC = () => {
                         navStatus={navStatus}
                         isUpdatingNav={isUpdatingNav}
                         onRefreshNav={fetchNavNotices}
+                        riverAlerts={riverAlerts}
+                        onUpdateRiverAlert={handleUpdateRiverAlert}
                         onAddTask={t => setTasks(prev => [...prev, t])} onUpdateTask={t => setTasks(prev => prev.map(old => old.id === t.id ? t : old))}
                         onDeleteTask={id => setTasks(prev => prev.filter(t => t.id !== id))} onUpdateFleet={setFleet} onUpdateTeam={setTeam}
                         onUpdateGuides={setGuides} onUpdatePartners={setPartners} onUpdateServiceTypes={setServiceTypes}
@@ -258,6 +280,8 @@ const App: React.FC = () => {
                         navStatus={navStatus}
                         isUpdatingNav={isUpdatingNav}
                         onRefreshNav={fetchNavNotices}
+                        riverAlerts={riverAlerts}
+                        onUpdateRiverAlert={handleUpdateRiverAlert}
                         onAddTask={t => setTasks(prev => [...prev, t])} onUpdateTask={t => setTasks(prev => prev.map(old => old.id === t.id ? t : old))}
                         onDeleteTask={id => setTasks(prev => prev.filter(t => t.id !== id))} onUpdateFleet={setFleet} onUpdateTeam={setTeam}
                         onUpdateGuides={setGuides} onUpdatePartners={setPartners} onUpdateServiceTypes={setServiceTypes}

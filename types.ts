@@ -210,6 +210,16 @@ export interface AppNotification {
   timestamp: Date;
 }
 
+export interface RiverAlert {
+  id: string;
+  type: 'DANGER' | 'INFO' | 'OP';
+  message: string;
+  reporter: string;
+  timestamp: string;
+  photoUrl?: string;
+  active: boolean;
+}
+
 export interface OperationalEntry {
   id: string;
   boatName: string;

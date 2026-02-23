@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getLiveWeatherAndRiverConditions, transcribeAudio, parseVoiceTask, getNavigationNotices } from '../services/geminiService';
-import { NavStatus } from '../types';
+import { NavStatus, RiverAlert } from '../types';
 
 interface AdminDashboardProps {
     tasks: ServiceTask[];
@@ -26,6 +26,8 @@ interface AdminDashboardProps {
     initialTab?: 'AGENDA' | 'EQUIPA' | 'FROTA' | 'CONFIG' | 'LOGISTICA' | 'NAVEGACAO';
     navStatus: NavStatus | null;
     isUpdatingNav: boolean;
+    riverAlerts?: RiverAlert[];
+    onUpdateRiverAlert?: (a: RiverAlert) => void;
     onRefreshNav: () => void;
     onAddTask: (t: ServiceTask) => void;
     onUpdateTask: (t: ServiceTask) => void;
@@ -49,6 +51,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     onUpdatePartners, onUpdateServiceTypes, onUpdateLogistics,
     navStatus,
     isUpdatingNav,
+    riverAlerts = [],
+    onUpdateRiverAlert,
     onRefreshNav,
     onNavigate,
     notify
@@ -370,14 +374,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="p-8 flex items-center justify-between border-b border-white/10">
                         <div>
                             <h2 className="text-2xl font-black tracking-tighter uppercase text-white">Deltatur</h2>
-                            <span className="text-[10px] font-black tracking-[0.2em] text-brand-gold uppercase bg-brand-gold/10 px-2 py-1 rounded">OS</span>
+                            <span className="text-[10px] font-black tracking-[0.2em] text-brand-gold uppercase bg-brand-gold/15 px-3 py-1 rounded-full border border-brand-gold/20 shadow-lg shadow-brand-gold/5">OS Core</span>
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar flex flex-col">
-                        <div className="p-6 md:p-8 mt-4 border-t border-white/10 text-center">
-                            <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] mb-1">Deltatur Digital</p>
-                            <p className="font-bold text-xs text-brand-gold">Modo Administrador</p>
+                    <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col">
+                        <div className="p-8 border-t border-white/10 text-center bg-gradient-to-b from-transparent to-white/5">
+                            <p className="text-[9px] text-white/40 uppercase tracking-[0.3em] mb-1">Deltatur Digital</p>
+                            <p className="font-bold text-xs text-brand-gold tracking-tight">Modo Administrador</p>
                         </div>
 
                         <nav className="flex-1 space-y-2 py-6 px-4">
@@ -403,10 +407,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             })}
                         </nav>
 
-                        <div className="p-8 border-t border-white/10 mt-auto">
-                            <button onClick={() => onNavigate(AppView.LANDING)} className="flex items-center gap-4 text-white/40 hover:text-brand-gold group transition-colors w-full">
-                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-brand-gold/10 transition-colors border border-transparent group-hover:border-brand-gold/20">
-                                    <Lock className="w-5 h-5" />
+                        <div className="p-8 border-t border-white/10 mt-auto bg-[#0A101C]/50">
+                            <button onClick={() => onNavigate(AppView.LANDING)} className="flex items-center gap-4 text-white/40 hover:text-brand-gold group transition-all duration-300 w-full">
+                                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-brand-gold/10 transition-all border border-white/5 group-hover:border-brand-gold/20 shadow-glass">
+                                    <Lock className="w-5 h-5 transition-transform group-hover:scale-110" />
                                 </div>
                                 <span className="font-bold text-sm tracking-wide">Bloquear Sessão</span>
                             </button>
@@ -419,96 +423,108 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <div className="p-6 md:p-12 md:max-w-7xl mx-auto space-y-8 animate-fadeIn">
 
                         {/* 1. TOP ACTION CENTER & TELEMETRY */}
-                        <div className="bg-white/5 backdrop-blur-md rounded-[40px] p-8 md:p-12 border border-white/10 text-white shadow-spatial relative overflow-hidden flex flex-col xl:flex-row gap-8 items-stretch group transition-all duration-500">
-                            <div className="absolute top-0 right-0 p-12 opacity-[0.03] group-hover:scale-110 transition-transform duration-1000">
-                                <Ship className="w-96 h-96 text-white" />
-                            </div>
+                        <div className="flex flex-col xl:flex-row gap-8 items-stretch animate-fadeIn">
 
-                            {/* HEADER LEFT */}
-                            <div className="flex-1 flex flex-col justify-center relative z-10 min-w-[300px]">
-                                <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter leading-none text-white">Centro de Comando</h1>
-                                <p className="text-brand-gold text-[10px] font-black uppercase tracking-[0.4em] mt-3">Deltatur Operational Intelligence</p>
+                            {/* HEADER LEFT: ACTION CENTER */}
+                            <div className="flex-1 min-w-[340px] bg-[#0A101C]/40 backdrop-blur-xl border border-white/10 rounded-[40px] p-8 md:p-12 relative overflow-hidden group shadow-spatial">
+                                <div className="absolute -right-12 -top-12 opacity-[0.02] group-hover:scale-110 group-hover:opacity-[0.04] transition-all duration-1000">
+                                    <Ship className="w-80 h-80 text-white" />
+                                </div>
 
-                                <div className="mt-8 flex items-center gap-4">
-                                    <button
-                                        onClick={() => {
-                                            setIsAddingTask(true);
-                                            setEditingTask(null);
-                                            setNewTask({
-                                                time: '10:00',
-                                                clientName: '',
-                                                pax: 2,
-                                                isPrivate: true,
-                                                status: 'PENDING',
-                                                notes: '',
-                                                crew: { condutor: '', assistente: '', guia: '' }
-                                            });
-                                        }}
-                                        className="w-fit px-8 py-4 bg-brand-gold text-[#0A101C] rounded-full font-bold text-sm flex items-center justify-center gap-3 shadow-[0_10px_30px_rgba(212,175,55,0.2)] hover:shadow-[0_10px_40px_rgba(212,175,55,0.4)] hover:-translate-y-0.5 transition-all duration-300"
-                                        aria-label="Criar Novo Passeio"
-                                        title="Criar Novo Passeio"
-                                    >
-                                        <Plus className="w-5 h-5" /> Novo Passeio
-                                    </button>
+                                <div className="relative z-10 flex flex-col justify-center h-full">
+                                    <h1 className="text-3xl md:text-[42px] font-black uppercase tracking-tighter leading-tight text-white mb-2">Centro de Comando</h1>
+                                    <p className="text-brand-gold text-[10px] font-black uppercase tracking-[0.4em] opacity-80">Deltatur Operational Intelligence</p>
 
-                                    <button
-                                        onClick={isRecording ? stopRecording : startRecording}
-                                        disabled={isParsingVoice}
-                                        className={`w-fit px-6 py-4 rounded-full font-bold text-sm flex items-center justify-center gap-3 shadow-glass hover:shadow-spatial hover:-translate-y-0.5 transition-all duration-300 ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-white/10 text-brand-gold hover:bg-white/20'}`}
-                                        title="Gravar Missão (Inteligência Artificial)"
-                                    >
-                                        {isParsingVoice ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                                        {isParsingVoice ? 'A Analisar...' : isRecording ? 'A Gravar...' : 'Gravar Missão'}
-                                    </button>
+                                    <div className="mt-10 flex flex-wrap items-center gap-4">
+                                        <button
+                                            onClick={() => {
+                                                setIsAddingTask(true);
+                                                setEditingTask(null);
+                                                setNewTask({
+                                                    time: '10:00',
+                                                    clientName: '',
+                                                    pax: 2,
+                                                    isPrivate: true,
+                                                    status: 'PENDING',
+                                                    notes: '',
+                                                    crew: { condutor: '', assistente: '', guia: '' }
+                                                });
+                                            }}
+                                            className="px-10 py-5 bg-brand-gold text-[#0A101C] rounded-full font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-[0_15px_40px_rgba(212,175,55,0.15)] hover:shadow-[0_20px_50px_rgba(212,175,55,0.3)] hover:-translate-y-1 transition-all duration-500"
+                                            aria-label="Criar Novo Passeio"
+                                            title="Criar Novo Passeio"
+                                        >
+                                            <Plus className="w-5 h-5" /> Novo Passeio
+                                        </button>
+
+                                        <button
+                                            onClick={isRecording ? stopRecording : startRecording}
+                                            disabled={isParsingVoice}
+                                            className={`px-8 py-5 rounded-full font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-glass border border-white/10 hover:border-brand-gold/30 hover:-translate-y-1 transition-all duration-500 ${isRecording ? 'bg-red-500/10 text-red-500 border-red-500/30 animate-pulse' : 'bg-white/5 text-brand-gold hover:bg-white/10'}`}
+                                            title="Gravar Missão (Inteligência Artificial)"
+                                        >
+                                            {isParsingVoice ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                                            {isParsingVoice ? 'A Analisar...' : isRecording ? 'A Gravar...' : 'Gravar Missão'}
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* TELEMETRY GRID */}
-                            <div className="flex-[2] bg-white/5 rounded-[24px] p-6 border border-white/10 relative z-10 backdrop-blur-md flex flex-col justify-between">
-                                <div className="flex justify-between items-center mb-4">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50 flex items-center gap-2">
-                                        <Zap className="w-3 h-3 text-brand-gold" /> Telemetria Pinhão (Live)
-                                    </p>
-                                    <button onClick={fetchTelemetry} disabled={loadingWeather} className="p-2 hover:bg-white/10 rounded-full transition-all" title="Atualizar Telemetria" aria-label="Atualizar Telemetria">
-                                        {loadingWeather ? <Loader2 className="w-4 h-4 animate-spin text-brand-gold" /> : <RefreshCw className="w-4 h-4 text-white/50 hover:text-white" />}
+                            {/* TELEMETRY GRID: DECOUPLED & SPACIOUS */}
+                            <div className="flex-[1.5] bg-[#0A101C]/40 backdrop-blur-xl rounded-[40px] px-8 py-10 border border-white/10 relative z-10 shadow-spatial group">
+                                <div className="flex justify-between items-center mb-10 px-2">
+                                    <div className="flex flex-col">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 flex items-center gap-2">
+                                            <Zap className="w-3 h-3 text-brand-gold fill-brand-gold" /> Telemetria River-Core
+                                        </p>
+                                        <h4 className="text-white font-black text-sm uppercase tracking-tighter mt-1">Pinhão (Live Ops)</h4>
+                                    </div>
+                                    <button
+                                        onClick={fetchTelemetry}
+                                        disabled={loadingWeather}
+                                        className="w-12 h-12 bg-white/5 hover:bg-brand-gold/10 rounded-2xl flex items-center justify-center transition-all border border-white/10 hover:border-brand-gold/20 group/btn"
+                                        title="Atualizar Telemetria"
+                                        aria-label="Atualizar Telemetria"
+                                    >
+                                        {loadingWeather ? <Loader2 className="w-5 h-5 animate-spin text-brand-gold" /> : <RefreshCw className="w-5 h-5 text-white/40 group-hover/btn:text-brand-gold transition-colors" />}
                                     </button>
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                                        <div className="flex justify-center mb-2"><Thermometer className="w-5 h-5 text-brand-gold" /></div>
-                                        <p className="text-xl font-mono font-bold">{weather?.temp ?? '--'}º</p>
-                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Temp</p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                    <div className="bg-gradient-to-br from-white/[0.03] to-transparent p-6 rounded-[32px] border border-white/5 hover:border-white/20 transition-all duration-500 relative overflow-hidden">
+                                        <div className="flex justify-center mb-4 opacity-40"><Thermometer className="w-6 h-6 text-brand-gold" /></div>
+                                        <p className="text-3xl font-black text-white tracking-tighter text-center">{weather?.temp ?? '--'}<span className="text-brand-gold text-sm ml-0.5">º</span></p>
+                                        <p className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] text-center mt-3">Temperatura</p>
                                     </div>
 
-                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                                        <div className="flex justify-center mb-2"><Wind className="w-5 h-5 text-brand-gold" /></div>
-                                        <div className="flex items-center justify-center gap-1">
-                                            <p className="text-xl font-mono font-bold">{weather?.windSpeed ?? '--'}</p>
-                                            <span className="text-[9px] text-white/40">{weather?.windDirection}</span>
+                                    <div className="bg-gradient-to-br from-white/[0.03] to-transparent p-6 rounded-[32px] border border-white/5 hover:border-white/20 transition-all duration-500">
+                                        <div className="flex justify-center mb-4 opacity-40"><Wind className="w-6 h-6 text-brand-gold" /></div>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <p className="text-3xl font-black text-white tracking-tighter">{weather?.windSpeed ?? '--'}</p>
+                                            <span className="text-[10px] font-bold text-brand-gold/60 uppercase">{weather?.windDirection}</span>
                                         </div>
-                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Vento (km/h)</p>
+                                        <p className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] text-center mt-3">Vento (km/h)</p>
                                     </div>
 
-                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                                        <div className="flex justify-center mb-2"><Waves className="w-5 h-5 text-brand-gold" /></div>
-                                        <p className="text-xl font-mono font-bold">{weather?.dams?.[0]?.dischargeRate ?? '--'}</p>
-                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Barragens</p>
+                                    <div className="bg-gradient-to-br from-white/[0.03] to-transparent p-6 rounded-[32px] border border-white/5 hover:border-white/20 transition-all duration-500">
+                                        <div className="flex justify-center mb-4 opacity-40"><Waves className="w-6 h-6 text-brand-gold" /></div>
+                                        <p className="text-3xl font-black text-white tracking-tighter text-center">{weather?.dams?.[0]?.dischargeRate ?? '--'}</p>
+                                        <p className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] text-center mt-3">Caudal m³/s</p>
                                     </div>
 
-                                    <div className="bg-brand-primary-dark/40 p-4 rounded-3xl border border-white/5 text-center">
-                                        <div className="flex justify-center mb-2">
-                                            {weather?.tideTrend === 'SUBIR' ? <ArrowUpRight className="w-5 h-5 text-red-400" /> : <ArrowDownRight className="w-5 h-5 text-green-400" />}
+                                    <div className="bg-gradient-to-br from-white/[0.03] to-transparent p-6 rounded-[32px] border border-white/5 hover:border-white/20 transition-all duration-500">
+                                        <div className="flex justify-center mb-4">
+                                            {weather?.tideTrend === 'SUBIR' ? <ArrowUpRight className="w-6 h-6 text-red-500/60" /> : <ArrowDownRight className="w-6 h-6 text-green-500/60" />}
                                         </div>
-                                        <p className="text-xl font-mono font-bold">{weather?.tideHeight ?? 'Normal'}</p>
-                                        <p className="text-[9px] font-black uppercase text-white/30 tracking-widest mt-1">Nível Rio</p>
+                                        <p className="text-3xl font-black text-white tracking-tighter text-center">{weather?.tideHeight ?? '2.1'}</p>
+                                        <p className="text-[9px] font-black uppercase text-white/20 tracking-[0.2em] text-center mt-3">Nível do Rio</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* 2. NAVIGATION BAR */}
-                        <div className="bg-white/5 backdrop-blur-md p-2 rounded-full border border-white/10 shadow-glass flex overflow-x-auto no-scrollbar gap-2">
+                        <div className="bg-[#0A101C]/60 backdrop-blur-2xl p-2 rounded-[32px] border border-white/10 shadow-glass-premium flex overflow-x-auto no-scrollbar gap-2 relative z-20">
                             {[
                                 { id: 'AGENDA', label: 'Agenda & Escala', icon: Calendar },
                                 { id: 'NAVEGACAO', label: 'Navegação IA', icon: Map },
@@ -520,9 +536,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 <button
                                     key={tab.id}
                                     onClick={() => setActiveTab(tab.id as any)}
-                                    className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 rounded-full text-xs font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-brand-gold text-[#0A101C] shadow-md' : 'bg-transparent text-white/50 hover:bg-white/10 text-white'}`}
+                                    className={`flex-1 flex items-center justify-center gap-3 px-8 py-5 rounded-[24px] text-[11px] font-black uppercase tracking-widest transition-all duration-500 whitespace-nowrap ${activeTab === tab.id ? 'bg-brand-gold text-[#0A101C] shadow-lg shadow-brand-gold/10 scale-100' : 'bg-transparent text-white/30 hover:bg-white/5 hover:text-white/70 hover:scale-[1.02]'}`}
                                 >
-                                    <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-[#0A101C]' : 'text-white/50'}`} /> {tab.label}
+                                    <tab.icon className={`w-4 h-4 transition-transform ${activeTab === tab.id ? 'text-[#0A101C] scale-110' : 'text-white/30 group-hover:text-white'}`} /> {tab.label}
                                 </button>
                             ))}
                         </div>
@@ -596,42 +612,83 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                     <div className="space-y-4">
                                         <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 ml-4">Despachos & Avisos Recentes</h4>
 
-                                        {isUpdatingNav ? (
-                                            <div className="p-20 text-center bg-white/5 rounded-[40px] border border-dashed border-white/10">
-                                                <Radio className="w-12 h-12 text-brand-gold animate-bounce mx-auto mb-4" />
-                                                <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/40">Intercetando comunicações oficiais...</p>
-                                            </div>
-                                        ) : !navStatus?.notices?.length ? (
-                                            <div className="p-20 text-center bg-white/5 rounded-[40px] border border-dashed border-white/10">
-                                                <CheckCircle className="w-12 h-12 text-green-500/50 mx-auto mb-4" />
-                                                <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/40">Nenhum perigo iminente reportado pela IA</p>
-                                            </div>
-                                        ) : (
-                                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                                {navStatus.notices.map((notice) => (
-                                                    <div key={notice.id} className={`bg-white/5 backdrop-blur-md p-6 rounded-[32px] border transition-all hover:bg-white/10 ${notice.severity === 'CRITICAL' ? 'border-red-500/30' : notice.severity === 'ALERT' ? 'border-brand-gold/30' : 'border-white/10'
-                                                        }`}>
-                                                        <div className="flex items-start justify-between mb-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${notice.source === 'APDL' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-brand-gold/10 text-brand-gold border border-brand-gold/20'
-                                                                    }`}>
-                                                                    {notice.source}
-                                                                </div>
-                                                                <span className="text-[10px] font-bold text-white/40 uppercase">{notice.type}</span>
-                                                            </div>
-                                                            <span className="text-[9px] font-black text-white/30">{new Date(notice.timestamp).toLocaleDateString()}</span>
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            {/* FEED COMUNITÁRIO (RIVER SECURITY FEED) */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between px-2">
+                                                    <h5 className="text-[11px] font-black text-red-500 uppercase tracking-widest flex items-center gap-2">
+                                                        <Zap className="w-4 h-4" /> River Security Feed (Staff)
+                                                    </h5>
+                                                    <span className="text-[10px] font-black text-white/30 uppercase">{riverAlerts.filter(a => a.active).length} Ativos</span>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {riverAlerts.length === 0 ? (
+                                                        <div className="p-12 text-center bg-white/[0.02] rounded-[40px] border border-dashed border-white/10 opacity-40">
+                                                            <Ship className="w-10 h-10 mx-auto mb-4 text-white/20" />
+                                                            <p className="text-[10px] font-black uppercase tracking-[0.3em]">Operações Limpas</p>
                                                         </div>
-                                                        <h5 className="text-lg font-black text-white uppercase tracking-tighter mb-2">{notice.title}</h5>
-                                                        <p className="text-sm text-white/60 leading-relaxed mb-4">{notice.description}</p>
-                                                        {notice.link && (
-                                                            <a href={notice.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-[10px] font-black text-brand-gold uppercase tracking-widest hover:underline">
-                                                                Ver Documento Original <ExternalLink className="w-3 h-3" />
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                    ) : (
+                                                        riverAlerts.map(alert => (
+                                                            <div key={alert.id} className={`p-8 rounded-[40px] bg-gradient-to-br from-white/[0.05] to-transparent border backdrop-blur-md transition-all duration-500 shadow-glass ${alert.active ? (alert.type === 'DANGER' ? 'border-red-500/30 bg-red-500/5' : 'border-white/10') : 'opacity-30 grayscale border-transparent scale-95'}`}>
+                                                                <div className="flex justify-between items-start mb-6">
+                                                                    <div className="flex items-center gap-4">
+                                                                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-inner ${alert.type === 'DANGER' ? 'bg-red-500/20 text-red-500' : 'bg-brand-gold/20 text-brand-gold'}`}>
+                                                                            {alert.type === 'DANGER' ? <AlertTriangle className="w-5 h-5" /> : <Info className="w-5 h-5" />}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/50">Reporte {alert.reporter}</p>
+                                                                            <p className="text-[9px] font-bold text-white/20 uppercase mt-1">{new Date(alert.timestamp).toLocaleString()}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <button
+                                                                        onClick={() => onUpdateRiverAlert && onUpdateRiverAlert({ ...alert, active: !alert.active })}
+                                                                        className={`px-6 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-300 ${alert.active ? 'bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20' : 'bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20'}`}
+                                                                    >
+                                                                        {alert.active ? 'Arquivar' : 'Reativar'}
+                                                                    </button>
+                                                                </div>
+                                                                <p className="text-sm text-white/90 font-medium italic leading-relaxed bg-white/5 p-4 rounded-3xl border border-white/5">"{alert.message}"</p>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
                                             </div>
-                                        )}
+
+                                            {/* AVISOS OFICIAIS */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between px-2">
+                                                    <h5 className="text-[11px] font-black text-brand-gold uppercase tracking-widest flex items-center gap-2">
+                                                        <ShieldCheck className="w-4 h-4" /> Editais Oficiais (APDL/IH)
+                                                    </h5>
+                                                    <span className="text-[10px] font-black text-white/30 uppercase">{navStatus?.notices?.length || 0} Detetados</span>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    {isUpdatingNav ? (
+                                                        <div className="p-16 text-center bg-white/[0.02] rounded-[40px] border border-white/10">
+                                                            <RefreshCw className="w-10 h-10 text-brand-gold animate-spin mx-auto mb-6" />
+                                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Analisando Editais...</p>
+                                                        </div>
+                                                    ) : !navStatus?.notices?.length ? (
+                                                        <div className="p-16 text-center bg-white/[0.02] rounded-[40px] border border-dashed border-white/10 opacity-40">
+                                                            <p className="text-[10px] font-black uppercase tracking-[0.3em]">Canais de Informação Limpos</p>
+                                                        </div>
+                                                    ) : (
+                                                        navStatus.notices.map(notice => (
+                                                            <div key={notice.id} className="p-8 rounded-[40px] bg-gradient-to-br from-white/[0.05] to-transparent border border-white/10 hover:border-brand-gold/30 hover:bg-white/[0.08] transition-all duration-500 group/notice shadow-glass backdrop-blur-sm">
+                                                                <div className="flex justify-between items-start mb-4">
+                                                                    <span className="px-4 py-1.5 bg-brand-gold/10 rounded-full text-[9px] font-black text-brand-gold uppercase tracking-widest border border-brand-gold/20">{notice.source}</span>
+                                                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest">{new Date(notice.timestamp).toLocaleDateString()}</span>
+                                                                </div>
+                                                                <h6 className="text-sm font-black text-white uppercase mb-3 tracking-tighter group-hover/notice:text-brand-gold transition-colors">{notice.title}</h6>
+                                                                <p className="text-[11px] text-white/50 leading-relaxed font-medium line-clamp-3 bg-black/20 p-4 rounded-2xl">{notice.description}</p>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     {/* SEÇÃO DE DIRETÓRIO & DADOS TÉCNICOS */}
